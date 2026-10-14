@@ -1,0 +1,1 @@
+awslabs.amazon-bedrock-agentcore-mcp-server==0.2.1

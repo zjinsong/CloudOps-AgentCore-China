@@ -1,0 +1,20 @@
+[
+  {
+    "name": "call_aws",
+    "description": "Execute bounded read-only monitoring AWS CLI commands in China, default cn-northwest-1 (cn-north-1 also allowed). Supports Lambda list-functions/config metadata, CloudWatch metrics/alarms/logs, EC2, ELB and RDS reads. Discover actual FunctionName before querying per-function Errors/Invocations/Duration. Lambda metadata --query/--output projections are stripped to protect secrets; list-functions returns bounded names and metadata. No writes, profiles, custom endpoints, credentials or local files. One command per call; max_results defaults 50, capped 100. Report pagination/truncation. If a query fails, adjust once, then report the actual error rather than repeatedly retrying. CLI syntax: aws cloudwatch list-metrics --namespace AWS/Bedrock-AgentCore --dimensions Name=Service,Value=AgentCore.Runtime. Service-first syntax is also accepted. Put result limits in max_results, not list-metrics --max-results. Discover real metric names and complete dimensions before get-metric-data. CommandRejected comes from the MCP adapter, not an AWS service outage.",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "cli_command"
+      ],
+      "properties": {
+        "cli_command": {
+          "type": "string"
+        },
+        "max_results": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+]

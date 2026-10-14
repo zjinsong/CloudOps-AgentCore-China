@@ -1,0 +1,28 @@
+[
+  {
+    "name": "get_cost_by_service",
+    "description": "查询指定时间段内按 AWS 服务分组的成本(人民币 CNY)。返回每个服务的花费、总额和是否为估算值。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "start": {"type": "string", "description": "开始日期 YYYY-MM-DD(含)"},
+        "end": {"type": "string", "description": "结束日期 YYYY-MM-DD(不含)"},
+        "granularity": {"type": "string", "description": "粒度 MONTHLY 或 DAILY,默认 MONTHLY"}
+      },
+      "required": ["start", "end"]
+    }
+  },
+  {
+    "name": "get_cost_forecast",
+    "description": "预测未来一段时间的 AWS 成本(人民币 CNY)。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "start": {"type": "string", "description": "预测开始日期 YYYY-MM-DD(未来)"},
+        "end": {"type": "string", "description": "预测结束日期 YYYY-MM-DD"},
+        "granularity": {"type": "string", "description": "粒度 MONTHLY 或 DAILY,默认 MONTHLY"}
+      },
+      "required": ["start", "end"]
+    }
+  }
+]

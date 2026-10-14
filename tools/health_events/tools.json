@@ -1,0 +1,1 @@
+[{"name":"list_health_events","description":"Read at most 40 AWS Health events captured by this platform's EventBridge integration. No events does not establish account health or complete historical coverage.","inputSchema":{"type":"object","properties":{}}}]

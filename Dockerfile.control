@@ -1,0 +1,15 @@
+FROM public.ecr.aws/docker/library/python:3.12-slim
+WORKDIR /app
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY scripts/install_terraform.py /tmp/install_terraform.py
+RUN python /tmp/install_terraform.py && rm /tmp/install_terraform.py
+COPY control ./control
+COPY framework ./framework
+COPY agents ./agents
+COPY hierarchy.json .
+COPY tools ./tools
+RUN useradd -m -u 1000 appuser && mkdir -p /workspace/.plugin-cache && chown -R appuser:appuser /workspace && chmod 700 /workspace
+USER appuser
+CMD ["uvicorn", "control.api:app", "--host", "0.0.0.0", "--port", "8098"]

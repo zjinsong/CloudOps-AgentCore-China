@@ -1,0 +1,167 @@
+[
+  {
+    "name": "get_pricing",
+    "description": "Query official AWS public prices, default cn-northwest-1. Supply region or up to three regions, precise service/product filters. Defaults to OnDemand, maximum 10 results per page and 16000 response characters. Returns real currency, units and price conditions, never account billing or discounts.",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "service_code"
+      ],
+      "properties": {
+        "service_code": {
+          "type": "string",
+          "description": "AWS service code (e.g., \"AmazonEC2\", \"AmazonS3\", \"AmazonES\")"
+        },
+        "region": {
+          "type": "string",
+          "description": "Single AWS region; default cn-northwest-1"
+        },
+        "filters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "description": "Filter model for AWS Price List API queries.",
+            "required": [
+              "Field",
+              "Value"
+            ],
+            "properties": {
+              "Field": {
+                "type": "string",
+                "description": "The field to filter on (e.g., 'instanceType', 'location')"
+              },
+              "Type": {
+                "type": "string",
+                "description": "The type of filter match"
+              },
+              "Value": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "max_allowed_characters": {
+          "type": "integer",
+          "description": "Response character limit, bounded to 1000..16000, default 12000"
+        },
+        "output_options": {
+          "type": "object",
+          "description": "Output filtering options for pricing responses to reduce response size.",
+          "properties": {
+            "pricing_terms": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "product_attributes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "exclude_free_products": {
+              "type": "boolean"
+            }
+          }
+        },
+        "max_results": {
+          "type": "integer",
+          "description": "Results per page, bounded to 1..10, default 10"
+        },
+        "next_token": {
+          "type": "string"
+        },
+        "regions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Up to three regions for comparison; omit region when using this"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_pricing_service_codes",
+    "description": "Get AWS service codes available in the Price List API.\n\n    **PURPOSE:** Discover which AWS services have pricing information available in the AWS Price List API.\n\n    **PARAMETERS:**\n    - filter (optional): Case-insensitive regex pattern to filter service codes (e.g., \"bedrock\" matches \"AmazonBedrock\", \"AmazonBedrockService\")\n\n    **WORKFLOW:** This is the starting point for any pricing query. Use this first to find the correct service code.\n\n    **RETURNS:** List of service codes (e.g., 'AmazonEC2', 'AmazonS3', 'AWSLambda') that can be used with other pricing tools.\n\n    **NEXT STEPS:**\n    - Use get_pricing_service_attributes() to see what filters are available for a service\n    - Use get_pricing() to get actual pricing data for a service\n\n    **NOTE:** Service codes may differ from AWS console names (e.g., 'AmazonES' for OpenSearch, 'AWSLambda' for Lambda).\n    ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filter": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_pricing_service_attributes",
+    "description": "Get filterable attributes available for an AWS service in the Pricing API.\n\n    **PURPOSE:** Discover what pricing dimensions (filters) are available for a specific AWS service.\n\n    **WORKFLOW:** Use this after get_pricing_service_codes() to see what filters you can apply to narrow down pricing queries.\n\n    **PARAMETERS:**\n    - service_code: AWS service code from get_pricing_service_codes() (e.g., 'AmazonEC2', 'AmazonRDS')\n    - filter (optional): Case-insensitive regex pattern to filter attribute names (e.g., \"instance\" matches \"instanceType\", \"instanceFamily\")\n\n    **RETURNS:** List of attribute names (e.g., 'instanceType', 'location', 'storageClass') that can be used as filters.\n\n    **NEXT STEPS:**\n    - Use get_pricing_attribute_values() to see valid values for each attribute\n    - Use these attributes in get_pricing() filters to get specific pricing data\n\n    **EXAMPLE:** For 'A",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "service_code"
+      ],
+      "properties": {
+        "service_code": {
+          "type": "string",
+          "description": "AWS service code (e.g., \"AmazonEC2\", \"AmazonS3\", \"AmazonES\")"
+        },
+        "filter": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_pricing_attribute_values",
+    "description": "Get valid values for pricing filter attributes.\n\n    **PURPOSE:** Discover what values are available for specific pricing filter attributes of an AWS service.\n\n    **WORKFLOW:** Use this after get_pricing_service_attributes() to see valid values for each filter attribute.\n\n    **PARAMETERS:**\n    - Service code from get_pricing_service_codes() (e.g., 'AmazonEC2', 'AmazonRDS')\n    - List of attribute names from get_pricing_service_attributes() (e.g., ['instanceType', 'location'])\n    - filters (optional): Dictionary mapping attribute names to regex patterns (e.g., {'instanceType': 't3'})\n\n    **RETURNS:** Dictionary mapping attribute names to their valid values. Filtered attributes return only matching values, unfiltered attributes return all values.\n\n    **EXAMPLE RETURN:**\n    ```\n    {\n        'instanceType': ['t2.micro', 't3.medium', 'm5.large', ...],\n        'location': ['US East (N.",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "service_code",
+        "attribute_names"
+      ],
+      "properties": {
+        "service_code": {
+          "type": "string",
+          "description": "AWS service code (e.g., \"AmazonEC2\", \"AmazonS3\", \"AmazonES\")"
+        },
+        "attribute_names": {
+          "type": "array",
+          "description": "List of attribute names (e.g., [\"instanceType\", \"location\", \"storageClass\"])",
+          "items": {
+            "type": "string"
+          }
+        },
+        "filters": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_price_list_urls",
+    "description": "Get download URLs for bulk pricing data files.\n\n    **PURPOSE:** Access complete AWS pricing datasets as downloadable files for historical analysis and bulk processing.\n\n    **WORKFLOW:** Use this for historical pricing analysis or bulk data processing when current pricing from get_pricing() isn't sufficient.\n\n    **PARAMETERS:**\n    - Service code from get_pricing_service_codes() (e.g., 'AmazonEC2', 'AmazonS3')\n    - AWS region (e.g., 'us-east-1', 'eu-west-1')\n    - Optional: effective_date for historical pricing (default: current date)\n\n    **RETURNS:** Dictionary with download URLs for different formats:\n    - 'csv': Direct download URL for CSV format\n    - 'json': Direct download URL for JSON format\n\n    **USE CASES:**\n    - Historical pricing analysis (get_pricing() only provides current pricing)\n    - Bulk data processing without repeated API calls\n    - Offline analysis of complet",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "service_code",
+        "region"
+      ],
+      "properties": {
+        "service_code": {
+          "type": "string",
+          "description": "AWS service code (e.g., \"AmazonEC2\", \"AmazonS3\", \"AmazonES\")"
+        },
+        "region": {
+          "type": "string",
+          "description": "AWS region (e.g., \"us-east-1\", \"eu-west-1\")"
+        },
+        "effective_date": {
+          "type": "string"
+        }
+      }
+    }
+  }
+]

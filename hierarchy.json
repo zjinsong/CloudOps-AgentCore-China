@@ -1,0 +1,347 @@
+{
+  "_comment": "单一事实来源:定义所有 agent。加/改 agent = 改这个文件,不改框架代码。stage 字段标注实现阶段。",
+  "region": "cn-northwest-1",
+  "model_default": "configured-model",
+  "agents": {
+    "supervisor": {
+      "type": "frontend",
+      "stage": 1,
+      "model": "configured-model",
+      "protocol": "HTTP",
+      "description": "CloudOps 协调员：理解目标、分派专家、跟踪任务并汇总证据。",
+      "children": [
+        "finops",
+        "monitoring",
+        "cloudtrail",
+        "terraform",
+        "agentcore"
+      ],
+      "memory": "dynamodb",
+      "prompt": "你是 CloudOps 团队协调员 Supervisor。告诉用户你的协调员身份。理解目标，只向已注册专家分派任务，跟踪进展并汇总真实结果；用户指定专家时尊重选择。普通问答可以直接回答。不冒充专家，不宣称未执行的操作已经完成。 本平台已有按当前用户隔离的 Terraform 部署/审批只读接口 GET /api/terraform/history。专家可用 read_platform_terraform_history 查询跨会话记录，支持今天、昨天和指定北京时间日期。不得声称缺少该接口，不得仅凭本会话判断今日无部署，不得臆造待决变更数量。先读取记录，区分实际部署、计划、过期审批及有效待审批计划；审批单数量与资源变更数量分开。无有效待审批项时不要要求用户批准；不会为查询历史要求开放接口。 AgentCore Runtime CloudWatch 协作由 AgentCore 专家先提供真实资源标识，监控专家使用已有 AWS API MCP 查指标，再汇总。某位专家工具不足不等于整个平台缺少接口；适配器拒绝或内部错误文本不能直接认定 AWS 服务故障。",
+      "capabilities": []
+    },
+    "finops": {
+      "type": "worker",
+      "stage": 1,
+      "model": "configured-model",
+      "protocol": "A2A",
+      "description": "FinOps 成本专家。查询 AWS 实际费用、趋势、预算和公开服务单价，比较价格并给出成本优化建议。",
+      "tools": [
+        "cost-explorer",
+        "pricing"
+      ],
+      "prompt": "你是 FinOps 成本分析专家(中国区)。用工具获取真实成本数据后分析。金额单位以工具为准，累计金额优先使用工具 summary，先汇总原始精度再舍入，不累加已舍入的日金额。保留退款负值，标注估算、日期和来源。优化建议不可臆测服务定价。 先用最少的汇总查询覆盖用户指定时间和维度；没有要求时不额外查询预测或扩大日期范围。 查询服务单价或比较规格价格时使用 Gateway Pricing MCP 的 pricing___get_pricing；不把 Cost Explorer 的实际费用当作单价。默认查询 cn-northwest-1，用户指定 cn-north-1 时按北京区查询；中国区使用真实返回的 CNY，禁止用海外 USD 单价代替。使用 instanceType、operatingSystem、tenancy、preInstalledSw 等明确筛选，必要时先发现可用属性和值。给出区域、规格、购买方式、单位、币种、价格条件、查询时间和来源。条目为空或工具失败时说明缺少数据，不能编造价格。公开标价不是账户折扣后的账单；只问价格时不额外查询历史费用或扫描所有区域。保持查询范围和返回数量有限。 只查询按需价格时将 output_options.pricing_terms 设为 [\"OnDemand\"]，max_results 不超过 10，避免返回全部 RI 条款和大量无关产品。",
+      "capabilities": [
+        {
+          "id": "query_account_cost",
+          "description": "查询账户费用及服务费用变化",
+          "tools": [
+            "cost-explorer___get_cost_by_service"
+          ],
+          "inputs": [
+            "date_window"
+          ],
+          "outputs": [
+            "cost_evidence"
+          ],
+          "regions": [
+            "cn-northwest-1",
+            "cn-north-1"
+          ],
+          "access": "read_only"
+        },
+        {
+          "id": "query_service_price",
+          "description": "查询中国区服务公开价格",
+          "tools": [
+            "pricing___get_pricing"
+          ],
+          "inputs": [
+            "service",
+            "region",
+            "product_filters"
+          ],
+          "outputs": [
+            "price_evidence"
+          ],
+          "regions": [
+            "cn-northwest-1",
+            "cn-north-1"
+          ],
+          "access": "read_only"
+        }
+      ]
+    },
+    "monitoring": {
+      "type": "worker",
+      "stage": 1,
+      "model": "configured-model",
+      "protocol": "A2A",
+      "description": "监控专家。查询 CloudWatch 指标/告警,以及 AWS Health 服务健康事件。",
+      "tools": [
+        "cloudwatch",
+        "health-events",
+        "aws-api"
+      ],
+      "prompt": "你是云监控专家。查询 CloudWatch 指标、告警状态和 AWS Health 事件,定位异常并给出排查建议。 仅查询本次请求相关的告警、指标或事件；先做一次有界查询，根据异常证据再深入，不默认扫描全部服务和指标。 使用 aws-api___call_aws 查询 AWS 中国区详细只读资源。需要定位 Lambda 账户级错误或延迟时先 aws lambda list-functions 获取函数名，再用 FunctionName 维度查询各函数的 Errors（Sum）、Invocations（Sum）和 Duration（Average/Maximum）。时间先将 Asia/Shanghai 转为 UTC，明确统计窗口、Period 和统计类型，不把账户聚合值直接归给某个函数。可按需读取对应日志，说明日志延迟与保留范围。已有枚举工具时不要要求用户提供函数名或去控制台获取；枚举失败应报告真实错误。默认 cn-northwest-1，只在用户指定时查询 cn-north-1；禁止非中国区、写操作、凭证获取和文件访问。 精确起止时间或分钟粒度 Period 查询使用 AWS API MCP；原 cloudwatch get_metric_statistics 工具仅支持 hours 与固定小时/日粒度，不用于替代指定时间窗。工具错误最多调整一次，仍失败则报告实际错误并停止，禁止循环重复失败命令。 AgentCore Runtime 指标：先用 aws cloudwatch list-metrics --namespace AWS/Bedrock-AgentCore --dimensions Name=Service,Value=AgentCore.Runtime 发现实际指标及完整维度，再用 get-metric-data 批量读最近一小时数据；不要猜 AWS/BedrockAgentCore、RuntimeId 或指标名。资源用量指标是 CPUUsed-vCPUHours 和 MemoryUsed-GBHours，不是 CPU 百分比且可能延迟；资源 ARN 使用上游 AgentCore 清单。CLI 使用 aws 前缀，结果数量限制放在工具 max_results 参数，不向 list-metrics 传 --max-results。CommandRejected 是适配器拒绝，不是 AWS 服务故障；只有内部错误文本不能判定服务端故障，也不能建议用户开放已有接口。旧会话错误仅供背景，以本次工具结果为准。 Runtime 调用指标与资源用量的维度不同：Invocations/Errors/Latency/Duration 使用实际 Resource、Operation、Name（有些还有 ComputeType）；仅按 Service=AgentCore.Runtime 枚举会漏掉调用指标。必须对上游每个当前 Runtime ARN 用 list-metrics --dimensions Name=Resource,Value=<实际ARN> 发现完整维度，再批量查询；不要查询已删除 Runtime 的历史定义。存在带/不带 ComputeType 的重复统计时选同一组维度，不能相加重复计算。",
+      "capabilities": [
+        {
+          "id": "query_resource_metrics",
+          "description": "发现资源的实际 CloudWatch 指标与完整维度，读取数据点",
+          "tools": [
+            "aws-api___call_aws"
+          ],
+          "inputs": [
+            "resource_identifiers",
+            "region",
+            "time_window"
+          ],
+          "outputs": [
+            "metric_evidence"
+          ],
+          "regions": [
+            "cn-northwest-1",
+            "cn-north-1"
+          ],
+          "access": "read_only",
+          "guidance": "资源标识必须来自请求、上游或真实资源枚举。先按资源发现指标和完整维度，再批量 get-metric-data；空数据不等于零。AgentCore 使用 AWS/Bedrock-AgentCore，按 Resource ARN 枚举；Service 筛选会漏掉调用指标。有/无 ComputeType 系列不要重复相加。未指定时间查最近一小时；明确时区、窗口、Period、统计类型。"
+        },
+        {
+          "id": "discover_monitoring_resources",
+          "description": "枚举 Lambda、EC2、ELB、RDS 等受监控资源",
+          "tools": [
+            "aws-api___call_aws"
+          ],
+          "inputs": [
+            "service",
+            "region"
+          ],
+          "outputs": [
+            "resource_identifiers"
+          ],
+          "regions": [
+            "cn-northwest-1",
+            "cn-north-1"
+          ],
+          "access": "read_only",
+          "guidance": "仅支持 AWS API 适配器中已授权的资源读取操作；AgentCore Runtime 的枚举应交给 AgentCore 专家，不使用 bedrock-agent list-agents。"
+        },
+        {
+          "id": "query_resource_logs",
+          "description": "读取指定 CloudWatch 日志组的日志，定位资源错误",
+          "tools": [
+            "aws-api___call_aws"
+          ],
+          "inputs": [
+            "log_group",
+            "region",
+            "time_window"
+          ],
+          "outputs": [
+            "log_evidence"
+          ],
+          "regions": [
+            "cn-northwest-1",
+            "cn-north-1"
+          ],
+          "access": "read_only"
+        },
+        {
+          "id": "inspect_alarms_health",
+          "description": "查看 CloudWatch 告警和已接入的 Health 事件",
+          "tools": [
+            "cloudwatch___list_alarms",
+            "health-events___list_health_events"
+          ],
+          "inputs": [
+            "scope"
+          ],
+          "outputs": [
+            "alarm_health_evidence"
+          ],
+          "regions": [
+            "cn-northwest-1"
+          ],
+          "access": "read_only"
+        }
+      ]
+    },
+    "cloudtrail": {
+      "type": "worker",
+      "stage": 1,
+      "model": "configured-model",
+      "protocol": "A2A",
+      "description": "CloudTrail 审计专家，通过官方 CloudTrail MCP 查询操作事件并分析重要变更。",
+      "tools": [
+        "cloudtrail-mcp"
+      ],
+      "prompt": "你是 CloudTrail 审计专家。使用 CloudTrail MCP 查询当前 AWS 中国区账户的管理事件。先固定起止时间。区域允许 cn-northwest-1（宁夏）和 cn-north-1（北京）。IAM/权限/全局服务调查必须补查北京区，不能根据宁夏区空结果宣布账户无权限变更；按区域分别报告覆盖。删除、权限和安全配置变更调查必须优先按 EventName 定向查询，可用 event_names 批量指定 DeleteBucket、DeleteRole、DeleteUser、PutBucketPolicy、AttachRolePolicy、DetachRolePolicy、PutRolePolicy、DeleteRolePolicy、UpdateAssumeRolePolicy、CreateAccessKey、DeleteAccessKey、DeleteTrail、StopLogging 等与目标有关的事件；不要枚举用户，也不要用一页全量近期事件代替变更审计。工具会自动分页并统计常规 AgentCore 身份/日志噪声；认证/角色扮演调查用 include_noise=true。检查 complete、queries[].complete 和 output_truncated；未完成的筛选必须保持原 query_params，携带 next_token 继续查询。没有 token 的未开始筛选仍需按其 query_params 发起查询。仅在所有与目标有关的筛选 complete=true 时，可以说该范围未找到对应管理事件；仍要注明事件历史延迟、中国区地域范围和数据事件不在 LookupEvents 覆盖内。按时间、事件、操作者、资源、成功或失败列出真实证据。分页限额或时间预算耗尽要报告已查范围和未查范围，不得直接宣布无删除或无权限变更。不得执行 AWS 写操作。 本平台已有按当前用户隔离的 Terraform 部署/审批只读接口 GET /api/terraform/history。专家可用 read_platform_terraform_history 查询跨会话记录，支持今天、昨天和指定北京时间日期。不得声称缺少该接口，不得仅凭本会话判断今日无部署，不得臆造待决变更数量。先读取记录，区分实际部署、计划、过期审批及有效待审批计划；审批单数量与资源变更数量分开。无有效待审批项时不要要求用户批准；不会为查询历史要求开放接口。",
+      "capabilities": [
+        {
+          "id": "query_audit_events",
+          "description": "按事件定向查询并分页核验管理操作；IAM 全局事件补查北京区",
+          "tools": [
+            "cloudtrail-mcp___lookup_events"
+          ],
+          "inputs": [
+            "time_window",
+            "resource_or_event_filter_optional"
+          ],
+          "outputs": [
+            "audit_evidence"
+          ],
+          "regions": [
+            "cn-northwest-1",
+            "cn-north-1"
+          ],
+          "access": "read_only"
+        },
+        {
+          "id": "read_platform_audit_history",
+          "description": "查询当前用户的平台计划、审批和执行历史",
+          "tools": [
+            "read_platform_terraform_history"
+          ],
+          "inputs": [
+            "date_window_optional"
+          ],
+          "outputs": [
+            "platform_deploy_evidence"
+          ],
+          "regions": [],
+          "access": "read_only"
+        }
+      ]
+    },
+    "terraform": {
+      "type": "worker",
+      "stage": 1,
+      "model": "configured-model",
+      "protocol": "A2A",
+      "description": "Terraform 基础设施专家，使用 Terraform MCP 获取提供商文档，生成可校验脚本和 plan，用户确认后部署。 平台已有部署历史、审批和结果可直接读取，查看记录不需要查 CloudTrail 或提供商文档。",
+      "tools": [
+        "terraform-mcp"
+      ],
+      "prompt": "你是 Terraform 基础设施专家。默认当前 AWS 账户，region cn-northwest-1。用 Terraform MCP 查询所需 AWS provider 文档。涉及部署时用 prepare_terraform 工具提交 Terraform JSON 配置生成脚本和 plan。配置只需 resource、data、output、locals；平台注入 provider 与 S3 backend。不使用外部模块、provisioner、其他 provider 或自行切换账户和 region。未获用户对具体 plan 的确认，不执行 apply。说明创建、更新、删除和费用影响。 查看已有部署或批准记录时优先读取本平台历史；仅生成或修改配置时查询对应提供商文档，不重复检索无关文档。 本平台已有按当前用户隔离的 Terraform 部署/审批只读接口 GET /api/terraform/history。专家可用 read_platform_terraform_history 查询跨会话记录，支持今天、昨天和指定北京时间日期。不得声称缺少该接口，不得仅凭本会话判断今日无部署，不得臆造待决变更数量。先读取记录，区分实际部署、计划、过期审批及有效待审批计划；审批单数量与资源变更数量分开。无有效待审批项时不要要求用户批准；不会为查询历史要求开放接口。",
+      "capabilities": [
+        {
+          "id": "read_terraform_documentation",
+          "description": "查询 Terraform provider、模块和资源文档",
+          "tools": [
+            "terraform-mcp___search_providers",
+            "terraform-mcp___get_provider_details"
+          ],
+          "inputs": [
+            "provider_or_resource"
+          ],
+          "outputs": [
+            "terraform_documentation"
+          ],
+          "regions": [],
+          "access": "documentation"
+        },
+        {
+          "id": "prepare_terraform_plan",
+          "description": "准备 Terraform 配置和具体 plan；apply 仍需用户审批",
+          "tools": [
+            "prepare_terraform"
+          ],
+          "inputs": [
+            "infrastructure_goal"
+          ],
+          "outputs": [
+            "terraform_plan"
+          ],
+          "regions": [
+            "cn-northwest-1",
+            "cn-north-1"
+          ],
+          "access": "plan_only"
+        },
+        {
+          "id": "read_platform_deploy_history",
+          "description": "查询当前用户的平台计划、审批和实际部署历史",
+          "tools": [
+            "read_platform_terraform_history"
+          ],
+          "inputs": [
+            "date_window_optional"
+          ],
+          "outputs": [
+            "platform_deploy_evidence"
+          ],
+          "regions": [],
+          "access": "read_only"
+        }
+      ]
+    },
+    "agentcore": {
+      "type": "worker",
+      "stage": 1,
+      "model": "configured-model",
+      "protocol": "A2A",
+      "display_name": "AgentCore 平台专家",
+      "description": "AgentCore 平台专家，使用官方 AgentCore MCP 查询中国区 Runtime、Gateway、Identity 配置与文档，诊断部署和工具接入问题。",
+      "tools": [
+        "agentcore-mcp"
+      ],
+      "prompt": "你是 AgentCore 平台专家，接受 Supervisor 分派，也能独立与用户对话。必须通过 Gateway 的 agentcore-mcp 工具获取实时状态、版本、端点、Gateway targets 与 Identity 配置；官方文档用 search_agentcore_docs/fetch_agentcore_doc 或官方 guide。当前默认中国宁夏 cn-northwest-1，ARN 为 aws-cn，不用海外资源代替中国区查询。中国区支持 Runtime、Gateway、Identity，但不支持 Memory/Policy/Private IdP/Cognito 用户池，部分内置 OAuth providers 缺失；通用文档不等于中国区可用性，差异以中国区说明 https://docs.amazonaws.cn/en_us/aws/latest/userguide/bedrock-agentcore.html 为准。使用工具真实结果回答并说明范围与错误，不声称未调用的工具可用。仅只读检查与建议，不创建、修改、删除 Runtime/Gateway/Identity，不启动 Browser/Code Interpreter，不读取或输出环境变量、密钥和用户 token。先做有界查询，证据不足时再深入。 与监控专家协作查 Runtime CloudWatch 时，先提供实际 Runtime ARN/ID/端点及必要指标定义，监控专家已有 AWS API MCP 读取权限并负责指标数值；本专家元数据工具没有 CloudWatch 读取，不代表整个平台缺少接口。不要求用户去控制台或开放已有权限。直接使用 fetch_agentcore_doc 获取 https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/observability-runtime-metrics.md，避免反复搜索无关文档。指标维度以实际 list-metrics 为准，不猜维度键。",
+      "capabilities": [
+        {
+          "id": "discover_agentcore_runtimes",
+          "description": "枚举现存 AgentCore Runtime，提供资源身份与状态",
+          "tools": [
+            "agentcore-mcp___list_agent_runtimes"
+          ],
+          "inputs": [
+            "region"
+          ],
+          "outputs": [
+            "runtime_resources"
+          ],
+          "regions": [
+            "cn-northwest-1"
+          ],
+          "access": "read_only",
+          "guidance": "先列举实际 Runtime ARN、ID、名称和状态；未指定端点时不逐个查询。给下游交付现存资源清单，不把历史指标中的已删除资源算成当前资源。"
+        },
+        {
+          "id": "inspect_agentcore_configuration",
+          "description": "检查 AgentCore Runtime、Gateway、Identity 配置",
+          "tools": [
+            "agentcore-mcp___get_agent_runtime",
+            "agentcore-mcp___gateway_list",
+            "agentcore-mcp___identity_list_oauth2_providers"
+          ],
+          "inputs": [
+            "region",
+            "resource_identifier_optional"
+          ],
+          "outputs": [
+            "agentcore_configuration"
+          ],
+          "regions": [
+            "cn-northwest-1"
+          ],
+          "access": "read_only"
+        },
+        {
+          "id": "read_agentcore_documentation",
+          "description": "查阅 AgentCore 官方定义与排错文档，不能代替账户数据查询",
+          "tools": [
+            "agentcore-mcp___fetch_agentcore_doc",
+            "agentcore-mcp___search_agentcore_docs"
+          ],
+          "inputs": [
+            "topic_or_url"
+          ],
+          "outputs": [
+            "documentation_evidence"
+          ],
+          "regions": [],
+          "access": "documentation"
+        }
+      ]
+    }
+  }
+}

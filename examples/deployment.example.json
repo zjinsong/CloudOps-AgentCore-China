@@ -1,0 +1,8 @@
+{
+  "project": "cloudops-ref",
+  "region": "cn-northwest-1",
+  "model_id": "<YOUR_MODEL_ID>",
+  "model_base_url": "https://<YOUR_APPROVED_MODEL_ENDPOINT>/v1",
+  "model_secret_arn": "arn:aws-cn:secretsmanager:cn-northwest-1:<ACCOUNT_ID>:secret:<MODEL_SECRET>",
+  "image_uri": "<ACCOUNT_ID>.dkr.ecr.cn-northwest-1.amazonaws.com.cn/cloudops-ref-runtime:<IMAGE_TAG>"
+}

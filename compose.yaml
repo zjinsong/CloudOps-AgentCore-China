@@ -1,0 +1,44 @@
+name: cloudops-reference
+x-service: &service
+  image: cloudops-reference-control:local
+  env_file: .secrets/control.env
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  logging:
+    driver: json-file
+    options: {max-size: 10m, max-file: '3'}
+services:
+  control:
+    <<: *service
+    build: {context: ., dockerfile: Dockerfile.control}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8098/ping')"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+  worker:
+    <<: *service
+    command: [python, -m, control.worker]
+    stop_grace_period: 3m
+    depends_on: {control: {condition: service_healthy}}
+  observer:
+    <<: *service
+    command: [python, -m, control.observe]
+    depends_on: {control: {condition: service_healthy}}
+  executor:
+    <<: *service
+    profiles: [terraform]
+    command: [python, -m, control.executor]
+    environment: {TMPDIR: /workspace, TF_PLUGIN_CACHE_DIR: /workspace/.plugin-cache}
+    volumes: [terraform-workspace:/workspace]
+    depends_on: {control: {condition: service_healthy}}
+  frontend:
+    build: frontend
+    ports: [127.0.0.1:3001:80]
+    restart: unless-stopped
+    depends_on: {control: {condition: service_healthy}}
+volumes:
+  terraform-workspace:

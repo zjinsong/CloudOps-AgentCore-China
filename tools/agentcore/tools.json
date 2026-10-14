@@ -1,0 +1,369 @@
+[
+  {
+    "name": "search_agentcore_docs",
+    "description": "Search curated AgentCore documentation and return ranked results with snippets.\n\n    This tool provides access to the complete Amazon Bedrock AgentCore documentation including:\n\n    **Platform Overview:**\n    - What is Bedrock AgentCore, security overview, quotas and limits\n\n    **Platform Services:**\n    - AgentCore Runtime (serverless deployment and scaling)\n    - AgentCore Memory (persistent knowledge with event and semantic memory)\n    - AgentCore Code Interpreter (secure code execution in isolated sandboxes)\n    - AgentCore Browser (fast, secure cloud-based browser for web interaction)\n    - AgentCore Gateway (transform existing APIs into agent tools)\n    - AgentCore Observability (real-time monitoring and tracing)\n    - AgentCore Identity (secure authentication and access management)\n\n    **Getting Started:**\n    - Prerequisites & environment setup\n    - Building your first agent or transforming existing code\n    - Local development & testing\n    - Deployment to AgentCore using CLI\n    - Troubleshooting & enhancement\n\n    **Examples & Tutorials:**\n    - Basic agent creation, memory integration, tool usage\n    - Streaming responses, error handling, authentication\n    - Customer service agents, code review assistants, data analysis\n    - Multi-agent workflows and integrations\n\n    **API Reference:**\n    - Data plane and control API documentation\n\n    Use this to find relevant AgentCore documentation for any development question.\n\n    Args:\n        query: Search query string (e.g., \"bedrock agentcore\", \"memory integration\", \"deployment guide\")\n        k: Maximum number o",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "query"
+      ],
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "k": {
+          "type": "integer"
+        }
+      }
+    }
+  },
+  {
+    "name": "fetch_agentcore_doc",
+    "description": "Fetch full document content by URL.\n\n    Retrieves complete AgentCore documentation content from URLs found via search_agentcore_docs\n    or provided directly. Use this to get full documentation pages including:\n\n    - Complete platform overview and service documentation\n    - Detailed getting started guides with step-by-step instructions\n    - Full API reference documentation\n    - Comprehensive tutorial and example code\n    - Complete deployment and configuration instructions\n    - Integration guides for various frameworks (Strands, LangGraph, CrewAI, etc.)\n\n    This provides the full content when search snippets aren't sufficient for\n    understanding or implementing AgentCore features.\n\n    Args:\n        uri: Document URI (supports http/https URLs)\n\n    Returns:\n        Dictionary containing:\n        - url: Canonical document URL\n        - title: Document title\n        - content: Full document text content\n        - error: Error message (if fetch failed)\n\n    ",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "uri"
+      ],
+      "properties": {
+        "uri": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_agent_runtime",
+    "description": "Get details of an AgentCore Runtime including its configuration.\n\n        This is a read-only operation with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "agent_runtime_id"
+      ],
+      "properties": {
+        "agent_runtime_id": {
+          "type": "string",
+          "description": "Runtime ID to retrieve."
+        },
+        "agent_runtime_version": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "list_agent_runtimes",
+    "description": "List all AgentCore Runtimes in the account.\n\n        This is a read-only operation with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "max_results": {
+          "type": "integer"
+        },
+        "next_token": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "list_agent_runtime_versions",
+    "description": "List all versions of a specific AgentCore Runtime.\n\n        This is a read-only operation with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "agent_runtime_id"
+      ],
+      "properties": {
+        "agent_runtime_id": {
+          "type": "string",
+          "description": "Runtime ID to list versions for."
+        },
+        "max_results": {
+          "type": "integer"
+        },
+        "next_token": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_agent_runtime_endpoint",
+    "description": "Get details of a specific runtime endpoint.\n\n        Read-only, no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "agent_runtime_id",
+        "endpoint_name"
+      ],
+      "properties": {
+        "agent_runtime_id": {
+          "type": "string",
+          "description": "Runtime ID."
+        },
+        "endpoint_name": {
+          "type": "string",
+          "description": "Endpoint name to retrieve."
+        }
+      }
+    }
+  },
+  {
+    "name": "list_agent_runtime_endpoints",
+    "description": "List all endpoints for an AgentCore Runtime.\n\n        Read-only, no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "agent_runtime_id"
+      ],
+      "properties": {
+        "agent_runtime_id": {
+          "type": "string",
+          "description": "Runtime ID to list endpoints for."
+        },
+        "max_results": {
+          "type": "integer"
+        },
+        "next_token": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_runtime_guide",
+    "description": "Get a comprehensive reference guide for AgentCore Runtime.\n\n        Covers CLI commands, agentcore.json schema, protocol contracts,\n        session lifecycle, IAM permissions, cost tiers, common patterns,\n        troubleshooting, and migration notes.\n\n        Read-only, no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "identity_get_workload_identity",
+    "description": "Get details of an AgentCore workload identity.\n\n        Returns the workload identity including allowed OAuth2 return\n        URLs, ARN, and timestamps. This is a read-only operation with\n        no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Workload identity name (3-255 chars)"
+        }
+      }
+    }
+  },
+  {
+    "name": "identity_list_workload_identities",
+    "description": "List AgentCore workload identities in the account.\n\n        Returns workload identity summaries with names and ARNs. This\n        is a read-only operation with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "max_results": {
+          "type": "integer"
+        },
+        "next_token": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "identity_get_api_key_provider",
+    "description": "Get metadata for an API key credential provider.\n\n        Returns the provider ARN, the ARN of the backing Secrets Manager\n        secret, and timestamps. Does NOT return the API key value itself\n        — that is only retrievable at runtime by workloads with a valid\n        workload identity token (via the SDK, not via MCP).\n\n        This is a read-only operation with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Credential provider name (1-128 chars)"
+        }
+      }
+    }
+  },
+  {
+    "name": "identity_list_api_key_providers",
+    "description": "List API key credential providers in the account.\n\n        Returns provider summaries with names, ARNs, and timestamps.\n        Does NOT return API key values. This is a read-only operation\n        with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "max_results": {
+          "type": "integer"
+        },
+        "next_token": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "identity_get_oauth2_provider",
+    "description": "Get metadata for an OAuth2 credential provider.\n\n        Returns the provider ARN, vendor, callback URL, Secrets Manager\n        secret ARN, OAuth2 discovery output, and timestamps. Does NOT\n        return the client_secret value — that is stored in Secrets\n        Manager and only used server-side during token exchanges.\n\n        This is a read-only operation with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Provider name (1-128 chars)"
+        }
+      }
+    }
+  },
+  {
+    "name": "identity_list_oauth2_providers",
+    "description": "List OAuth2 credential providers in the account.\n\n        Returns provider summaries with names, ARNs, vendors, and\n        timestamps. Does NOT return client secrets. This is a read-only\n        operation with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "max_results": {
+          "type": "integer"
+        },
+        "next_token": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "identity_get_token_vault",
+    "description": "Get details of an AgentCore Identity token vault.\n\n        Returns the token vault ID, KMS configuration (key type and key\n        ARN), and last-modified timestamp. This is a read-only operation\n        with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "token_vault_id": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "identity_get_resource_policy",
+    "description": "Get the resource-based policy attached to an AgentCore resource.\n\n        Returns the policy as a JSON object. If no policy is attached,\n        returns a success response with an empty policy. This is a\n        read-only operation with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "resource_arn"
+      ],
+      "properties": {
+        "resource_arn": {
+          "type": "string",
+          "description": "ARN of the AgentCore resource."
+        }
+      }
+    }
+  },
+  {
+    "name": "get_identity_guide",
+    "description": "Get the comprehensive AgentCore Identity guide.\n\n        Returns a detailed reference covering: prerequisites, cost tiers,\n        data-plane exclusion rationale, CLI commands, agentcore.json\n        schema, OAuth2 provider config shapes, common patterns,\n        troubleshooting, IAM permissions, and migration notes.\n\n        This is a read-only operation with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "gateway_get",
+    "description": "Get details of an AgentCore Gateway.\n\n        Returns the gateway including status, authorizer configuration, URL,\n        protocol settings, and associated workload identity. This is a\n        read-only operation with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "gateway_identifier"
+      ],
+      "properties": {
+        "gateway_identifier": {
+          "type": "string",
+          "description": "Gateway ID. Pattern: ([0-9a-z][-]?){1,100}-[0-9a-z]{10}"
+        }
+      }
+    }
+  },
+  {
+    "name": "gateway_list",
+    "description": "List all AgentCore Gateways in the account.\n\n        Returns gateway summaries with IDs, names, authorizer types, status,\n        and timestamps. This is a read-only operation with no cost\n        implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "max_results": {
+          "type": "integer"
+        },
+        "next_token": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "gateway_target_get",
+    "description": "Get details of a gateway target.\n\n        Returns the target including status, credential provider config,\n        target configuration, metadata configuration, and sync timestamps.\n        This is a read-only operation with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "gateway_identifier",
+        "target_id"
+      ],
+      "properties": {
+        "gateway_identifier": {
+          "type": "string",
+          "description": "Gateway ID"
+        },
+        "target_id": {
+          "type": "string",
+          "description": "Target ID. Pattern: [0-9a-zA-Z]{10}"
+        }
+      }
+    }
+  },
+  {
+    "name": "gateway_target_list",
+    "description": "List all targets attached to a gateway.\n\n        Returns target summaries with IDs, names, status, and timestamps.\n        This is a read-only operation with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "gateway_identifier"
+      ],
+      "properties": {
+        "gateway_identifier": {
+          "type": "string",
+          "description": "Gateway ID whose targets to list"
+        },
+        "max_results": {
+          "type": "integer"
+        },
+        "next_token": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "gateway_resource_policy_get",
+    "description": "Get the resource-based policy attached to a gateway.\n\n        Returns the raw JSON policy document. This is a read-only operation\n        with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "required": [
+        "resource_arn"
+      ],
+      "properties": {
+        "resource_arn": {
+          "type": "string",
+          "description": "ARN of the gateway resource (20-1011 chars)"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_gateway_guide",
+    "description": "Get the comprehensive AgentCore Gateway guide.\n\n        Returns a detailed reference covering: prerequisites, tool cost\n        tiers, excluded operations and security notes, CLI commands,\n        agentcore.json schema, target types, common patterns, debugging,\n        troubleshooting, IAM permissions, and migration notes.\n\n        This is a read-only operation with no cost implications.\n        ",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  }
+]

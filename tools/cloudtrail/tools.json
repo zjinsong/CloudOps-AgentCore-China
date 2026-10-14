@@ -1,0 +1,52 @@
+[
+  {
+    "name": "lookup_events",
+    "description": "Read-only CloudTrail management event history in China Regions. For IAM/global events also query cn-north-1 (Beijing); a Ningxia-only empty result is insufficient. Automatically follows pages within 24 seconds / max_pages (default 24). For deletion or IAM/policy investigations use event_names, e.g. [DeleteBucket,DeleteRole,PutBucketPolicy,AttachRolePolicy,PutRolePolicy], instead of broad user enumeration. Each event name is queried separately (CloudTrail allows one LookupAttribute). Check complete, queries[].complete/next_token/query_params and output_truncated. Never infer no changes from an incomplete query. Routine AgentCore service AssumeRole/CreateLogStream noise is counted and hidden by default; human/unfamiliar AssumeRole remains. Use include_noise for authentication investigations. This covers management events, not S3 object/data events or other Regions. Continuation must preserve the exact original time range and attribute filter.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "start_time": {
+          "type": "string"
+        },
+        "end_time": {
+          "type": "string"
+        },
+        "attribute_key": {
+          "type": "string"
+        },
+        "attribute_value": {
+          "type": "string"
+        },
+        "max_results": {
+          "type": "integer"
+        },
+        "next_token": {
+          "type": "string"
+        },
+        "region": {
+          "type": "string",
+          "description": "China Region: cn-northwest-1 (default) or cn-north-1. IAM/global-service audits must also check Beijing."
+        },
+        "event_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "1-16 specific EventNames. Do not combine with attribute_key/value or next_token."
+        },
+        "include_noise": {
+          "type": "boolean",
+          "description": "Include routine AgentCore service authentication/logging events; defaults false."
+        },
+        "max_pages": {
+          "type": "integer",
+          "description": "Total page budget 1-24; defaults 24."
+        },
+        "max_events": {
+          "type": "integer",
+          "description": "Maximum returned events 1-200; defaults 100. Omitted count remains explicit."
+        }
+      }
+    }
+  }
+]

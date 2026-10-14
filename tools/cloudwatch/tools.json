@@ -1,0 +1,28 @@
+[
+  {
+    "name": "list_alarms",
+    "description": "列出 CloudWatch 告警及其状态。可按状态过滤。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "state": {"type": "string", "description": "过滤状态:OK | ALARM | INSUFFICIENT_DATA(可选)"}
+      },
+      "required": []
+    }
+  },
+  {
+    "name": "get_metric_statistics",
+    "description": "查询某 CloudWatch 指标在回看时间窗内的统计数据点(如 EC2 CPU 利用率)。",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "namespace": {"type": "string", "description": "指标命名空间,如 AWS/EC2"},
+        "metric_name": {"type": "string", "description": "指标名,如 CPUUtilization"},
+        "stat": {"type": "string", "description": "统计量 Average|Sum|Maximum|Minimum,默认 Average"},
+        "hours": {"type": "number", "description": "回看小时数,默认 24"},
+        "dimensions": {"type": "array", "description": "维度过滤 [{\"Name\":\"InstanceId\",\"Value\":\"i-xxx\"}](可选)", "items": {"type": "object"}}
+      },
+      "required": ["namespace", "metric_name"]
+    }
+  }
+]
