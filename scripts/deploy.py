@@ -112,8 +112,14 @@ def foundation(cfg):
                             'Condition':{'Bool':{'aws:SecureTransport':'false'}}}])))
         if key=='work':s3.put_bucket_versioning(Bucket=bucket,VersioningConfiguration={'Status':'Enabled'})
         prefix='users/' if key=='chat' else 'cloudops/users/'
-        s3.put_bucket_lifecycle_configuration(Bucket=bucket,LifecycleConfiguration={'Rules':[{'ID':'history-30-days','Status':'Enabled',
-          'Filter':{'Prefix':prefix},'Expiration':{'Days':30},'NoncurrentVersionExpiration':{'NoncurrentDays':30}}]})
+        rules=[{'ID':'history-30-days','Status':'Enabled','Filter':{'Prefix':prefix},
+                'Expiration':{'Days':30},'NoncurrentVersionExpiration':{'NoncurrentDays':30}}]
+        if key=='work':
+            rules.append({'ID':'session-checkpoints-30-days','Status':'Enabled','Filter':{'Prefix':'cloudops/sessions/'},
+                          'Expiration':{'Days':30},'NoncurrentVersionExpiration':{'NoncurrentDays':30}})
+            rules.append({'ID':'layer-builds-14-days','Status':'Enabled','Filter':{'Prefix':'build/layers/'},
+                          'Expiration':{'Days':14},'NoncurrentVersionExpiration':{'NoncurrentDays':14}})
+        s3.put_bucket_lifecycle_configuration(Bucket=bucket,LifecycleConfiguration={'Rules':rules})
     cfg['common']={'AWS_REGION':region,'AWS_DEFAULT_REGION':region,'CLOUDOPS_ACCOUNT':account,'CLOUDOPS_TABLE':table,
                    'CLOUDOPS_BUCKET':buckets['work'],'CLOUDOPS_CHAT_BUCKET':buckets['chat'],'CLOUDOPS_ENABLE_DEFAULT_ROUTINES':'false',
                    'CLOUDOPS_ENABLE_APPLY':'false','CLOUDOPS_ENABLE_TERRAFORM_PLAN':'false','MODEL_ID':cfg['model_id'],'MODEL_BASE_URL':cfg['model_base_url'],'MODEL_SECRET_ARN':cfg['model_secret_arn']}
@@ -136,8 +142,9 @@ def foundation(cfg):
         allow(['logs:FilterLogEvents'],f'arn:aws-cn:logs:{region}:{account}:log-group:aws/spans:*'),
         allow(['xray:PutTraceSegments','xray:PutTelemetryRecords'],'*')])
     profile=cfg['project']+'-web'
-    try:iam.create_instance_profile(InstanceProfileName=profile)
+    try:iam.create_instance_profile(InstanceProfileName=profile,Tags=[{'Key':k,'Value':v} for k,v in tags(cfg).items()])
     except iam.exceptions.EntityAlreadyExistsException:pass
+    owned({t['Key']:t['Value'] for t in iam.list_instance_profile_tags(InstanceProfileName=profile)['Tags']},cfg)
     existing=iam.get_instance_profile(InstanceProfileName=profile)['InstanceProfile']['Roles']
     if existing and existing[0]['Arn']!=cfg['ec2_role']:raise PermissionError('Instance profile belongs to another role')
     if not existing:iam.add_role_to_instance_profile(InstanceProfileName=profile,RoleName=profile)
@@ -237,6 +244,10 @@ def gateway(cfg):
         else:raise TimeoutError('Target not ready: '+target)
     events=boto3.client('events',region_name=region)
     rule=cfg['project']+'-health'
+    try:
+        existing_rule=events.describe_rule(Name=rule)
+        owned({t['Key']:t['Value'] for t in events.list_tags_for_resource(ResourceARN=existing_rule['Arn'])['Tags']},cfg)
+    except events.exceptions.ResourceNotFoundException:pass
     rule_arn=events.put_rule(Name=rule,EventPattern=json.dumps({'source':['aws.health'],'account':[account]}),State='ENABLED',
                              Tags=[{'Key':k,'Value':v} for k,v in tags(cfg).items()])['RuleArn']
     try:lam.add_permission(FunctionName=cfg['project']+'-health-events',StatementId='HealthEvents',Action='lambda:InvokeFunction',Principal='events.amazonaws.com',SourceArn=rule_arn,SourceAccount=account)

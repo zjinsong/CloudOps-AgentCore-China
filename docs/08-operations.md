@@ -39,7 +39,7 @@ V2 从已准备的快照恢复环境，减少每个实例重复初始化；它�
 
 同样“100 次任务”，计划步骤、工具数量和 token 可以差很多。先在测试账号跑固定题集，记录日用量与账单，再估算客户演示预算。此仓库不写一个无法复现的固定每日价格。
 
-查看当前[中国区 AgentCore 价格](https://www.amazonaws.cn/bedrock/agentcore/pricing/)，以及模型供应商价格。Identity 费用与本项目无 OAuth/API Key Provider 的模式应分开分析，不能把 API Key 请求价格当成用户登录费。
+查看当前[中国区 AgentCore 价格](https://www.amazonaws.cn/agentcore/pricing/)，以及模型供应商价格。Identity 费用与本项目无 OAuth/API Key Provider 的模式应分开分析，不能把 API Key 请求价格当成用户登录费。
 
 控制建议：关闭默认定时任务；限制分段预算；只查询必要资源；日志保留 30 天；任务摘要查询使用索引；监控 DDB/CloudWatch 费用；设置账号预算告警。调度用 active 稀疏索引轮询，未部署 SQS；如果增加队列，它仍只能做唤醒提示，DDB 是状态依据。
 

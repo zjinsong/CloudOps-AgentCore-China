@@ -35,7 +35,25 @@ docker buildx build --platform linux/arm64 --provenance=false --push \
   -t "$HELLO_IMAGE" examples/hello
 ```
 
-当前 Runtime Role 的 ECR 读取权限仅覆盖主镜像仓库，因此 **需要先给该 Role 添加 Hello 仓库的三项镜像读取权限**：`ecr:BatchGetImage`、`ecr:GetDownloadUrlForLayer`、`ecr:BatchCheckLayerAvailability`，资源只限 Hello 仓库 ARN。不要扩大成所有 ECR 仓库。
+当前 Runtime Role 的 ECR 读取权限仅覆盖主镜像仓库，因此需要用部署身份添加 Hello 仓库的读取权限。下面生成独立的范围限定策略，不改主镜像策略：
+
+```bash
+python - <<'PY'
+import json, boto3
+cfg = json.load(open('.state/deployment.json'))
+repository = 'cloudops-ref-hello'
+arn = f'arn:aws-cn:ecr:{cfg["region"]}:{cfg["account"]}:repository/{repository}'
+policy = {'Version': '2012-10-17', 'Statement': [{
+    'Effect': 'Allow',
+    'Action': ['ecr:BatchGetImage', 'ecr:GetDownloadUrlForLayer', 'ecr:BatchCheckLayerAvailability'],
+    'Resource': arn,
+}]}
+boto3.client('iam', region_name=cfg['region']).put_role_policy(
+    RoleName=cfg['project'] + '-runtime', PolicyName='hello-image-read',
+    PolicyDocument=json.dumps(policy),
+)
+PY
+```
 
 使用下面的 Python 创建；`project` 名称读取私有配置，匹配角色的信任范围：
 
