@@ -62,13 +62,15 @@ python scripts/deploy.py foundation --apply
 
 ## 5. 构建 Layer 和镜像
 
+在 x86_64 EC2 上先完成[ARM64 仿真与 Buildx 配置](02-prerequisites.md#x86_64-主机构建-arm64-镜像)，确认测试容器输出 `aarch64`，再执行：
+
 ```bash
 python scripts/build_mcp_lambda_layers.py
 python scripts/build_inspection_layers.py
 bash scripts/build_runtime.sh
 ```
 
-Layer 在 Linux x86_64 / Python 3.12 环境打包到 `.state/mcp-lambda-layers/`。Runtime 镜像按 ARM64 构建并推送到 ECR。构建器需支持 `linux/arm64`，并可拉取依赖和工具镜像。
+Layer 在 Linux x86_64 / Python 3.12 环境打包到 `.state/mcp-lambda-layers/`。`build_runtime.sh` 读取配置中的 `image_uri`，执行 ECR 登录及 `docker buildx build --platform linux/arm64 --provenance=false --push`；镜像直接写入 ECR，不加载到本机 Docker 镜像列表。构建器需可拉取依赖和工具镜像。
 
 ## 6. 创建 Gateway 与工具
 

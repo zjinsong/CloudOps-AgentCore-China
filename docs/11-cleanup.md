@@ -141,4 +141,10 @@ aws iam delete-role --role-name '<PROJECT_ROLE>'
 - EC2 为手工创建，脚本不会删除。停止或终止专用测试实例，检查 EBS、快照、弹性 IP 和手工创建的网络资源。停止实例仍可能产生磁盘等费用。
 - 检查手工创建的 DynamoDB 备份、日志和额外镜像；确认清理后再删除本地私有状态及 Secret 文件。
 
+若本机构建器仅用于该项目，可删除构建器及其构建缓存：
+
+```bash
+docker buildx rm cloudops-builder
+```
+
 通过标准：项目 Runtime、Gateway、Target、Lambda、Layer 版本、桶、表和 IAM 资源均不存在；Secret 进入计划删除；专用 EC2 及附属资源已按需释放。最后检查账单；资源删除与费用显示存在延迟。

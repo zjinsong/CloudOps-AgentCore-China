@@ -28,7 +28,25 @@ docker buildx inspect --bootstrap
 git --version
 ```
 
-Buildx 支持平台必须包含 `linux/arm64`。x86_64 主机需预先配置 ARM64 仿真或远端构建器。Lambda Layer 必须在 Linux x86_64 / Python 3.12 环境构建。
+Lambda Layer 在 Linux x86_64 / Python 3.12 环境构建；Runtime 镜像按下一节配置跨架构构建。
+
+## x86_64 主机构建 ARM64 镜像
+
+在上述 Ubuntu x86_64 构建主机上注册 ARM64 QEMU 仿真，并创建独立的 Buildx 构建器：
+
+```bash
+docker run --privileged --rm tonistiigi/binfmt --install arm64
+docker buildx create --name cloudops-builder --driver docker-container --use
+docker buildx inspect --bootstrap
+docker run --rm --platform linux/arm64 \
+  public.ecr.aws/docker/library/python:3.12-slim uname -m
+```
+
+通过标准：Buildx 输出的 `Platforms` 包含 `linux/arm64`，测试容器输出 `aarch64`。同名构建器已存在时，用 `docker buildx use cloudops-builder` 代替 `create`。主机重启后若仿真注册丢失，重新执行第一条命令。
+
+`--privileged` 用于向构建主机注册 `binfmt_misc`，不用于应用容器。该步骤需要拉取 Docker Hub 的 `tonistiigi/binfmt`；使用镜像代理时替换为对应镜像地址。支持 ARM64 的现有构建器或原生 ARM64 远端节点也可复用，配置方式见 [Docker 多平台构建文档](https://docs.docker.com/build/building/multi-platform/)。
+
+完成后，部署阶段的 `bash scripts/build_runtime.sh` 会调用当前构建器，以 `--platform linux/arm64` 构建并直接推送 ECR。Web 与控制服务仍在 x86_64 主机上按本机架构构建，Lambda Layer 仍为 x86_64。
 
 ## 身份与权限
 
