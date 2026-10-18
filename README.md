@@ -2,6 +2,28 @@
 
 基于 Amazon Bedrock AgentCore 和 Strands Agents 的云运维参考实现。协调员根据用户请求分派专家，通过只读 MCP 工具查询 AWS 资源、指标、审计事件和费用，汇总带工具证据的结果。
 
+## 页面功能
+
+Web 提供 CloudOps 工作区和观测指标两个入口，包含以下功能：
+
+| 页面 / 功能 | 内容 |
+| --- | --- |
+| 专家对话与协作 | 单独向专家提问，或由协调员选择专家；支持显式指定专家、并行分工和上游结果传递 |
+| 团队管理 | 查看专家职责、启用状态和任务能力可用性；启用或停用专家 |
+| 会话历史与任务进度 | 保存对话、任务状态和专家结果；刷新后继续查看，支持从任务或回答进入调用链 |
+| 定时任务 | 创建、编辑、启停和删除任务，配置执行时间、时区及重复周期，查看运行记录与结果；预置任务默认停用 |
+| 观测指标 → 服务指标 | 查看各 Agent Runtime 和共享 Gateway 的调用、错误、延迟等指标；支持时间范围筛选、手动刷新和每分钟自动刷新 |
+| 观测指标 → 任务调用链 | 按时间、状态和专家筛选任务，分页查看详情；展示 Task ID、Trace ID、总耗时、执行尝试次数及阶段 / Span 时间线 |
+| Terraform 变更审批 | 保留 plan 详情、审批与执行历史界面；默认不启用 plan/apply，执行需额外配置角色与权限 |
+
+### 服务指标与 Trace / Span
+
+- **服务指标**：Runtime 展示调用次数、错误、延迟、运行或连接时长，以及 CPU（vCPUh）和内存（GBh）用量；Gateway 展示调用、错误、限流、延迟和 Target 执行时间。协调员使用 WebSocket，其连接指标与专家 HTTP 请求指标分别展示。
+- **Trace**：通过 Trace ID 关联同一业务任务的调用过程，结合任务记录定位规划、分派、专家执行和汇总阶段。
+- **Span**：表示专家、模型或 MCP 调用的执行片段，记录父子关联、时间和错误状态；页面以时间线展示并行与串行调用，区分任务阶段记录和 SDK Span。
+
+服务指标随应用部署提供；模型和工具的 SDK Span 需要完成遥测配置。CPU / 内存数值为资源用量，非实时利用率百分比。配置及排障见[观测与排障](docs/07-observability.md)，协作机制见[多 Agent 调度](docs/06-harness.md)，功能验收见[测试与验收](docs/10-testing.md)。
+
 ## 架构
 
 ```mermaid
@@ -27,7 +49,7 @@ flowchart LR
 | AgentCore | Runtime、Gateway 等平台配置 |
 | Terraform | Provider 文档与基础设施方案 |
 
-默认部署：宁夏区 `cn-northwest-1`、六个 Runtime、一个 Gateway、八组 Lambda Target、四个 EC2 容器。Terraform plan/apply 和定时任务自动执行默认关闭。模型通过 OpenAI 兼容 HTTPS 接口调用，密钥存放在 Secrets Manager。
+默认部署：宁夏区 `cn-northwest-1`、六个 Runtime、一个 Gateway、八组 Lambda Target、四个 EC2 容器。Terraform plan/apply 默认关闭，预置定时任务默认停用；用户可在页面创建并启用定时任务。模型通过 OpenAI 兼容 HTTPS 接口调用，密钥存放在 Secrets Manager。
 
 ## 部署、测试与清理
 
@@ -59,5 +81,7 @@ python scripts/init_config.py
 ## 使用范围
 
 本项目提供应用账号登录和用户记录隔离；企业 SSO、租户级 AWS 权限隔离、自动答案语义评分和 Terraform 执行角色不包含在默认部署中。完整部署是否可用，应按测试指南在目标账号验收；本地测试不替代云端验证。
+
+本仓库聚焦 CloudOps，不包含 Codex Coding 工作区、代码沙箱、托管浏览器及录屏功能。
 
 [技术文档](docs/README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [来源与许可](NOTICE.md)
