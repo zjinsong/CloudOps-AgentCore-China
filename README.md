@@ -69,7 +69,9 @@ Web 提供 CloudOps 工作区和观测指标两个入口，包含以下功能：
 - **Trace**：通过 Trace ID 关联同一业务任务的调用过程，结合任务记录定位规划、分派、专家执行和汇总阶段。
 - **Span**：表示专家、模型或 MCP 调用的执行片段，记录父子关联、时间和错误状态；页面以时间线展示并行与串行调用，区分任务阶段记录和 SDK Span。
 
-服务指标随应用部署提供；模型和工具的 SDK Span 需要完成遥测配置。CPU / 内存数值为资源用量，非实时利用率百分比。配置及排障见[观测与排障](docs/07-observability.md)，协作机制见[多 Agent 调度](docs/06-harness.md)，功能验收见[测试与验收](docs/10-testing.md)。
+部署后可查看 Runtime 和 Gateway 服务指标。完成部署指南中的[任务遥测配置](docs/03-deployment.md#8-配置任务遥测)后，还可查看模型和工具调用的耗时与错误。CPU、内存展示所选时间段的累计资源用量。
+
+参考：[观测与排障](docs/07-observability.md) · [多 Agent 调度](docs/06-harness.md) · [测试与验收](docs/10-testing.md)。
 
 ## 测试与清理
 
