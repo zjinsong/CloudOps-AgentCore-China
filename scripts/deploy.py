@@ -7,6 +7,7 @@ import argparse,io,json,os,re,sys,time,zipfile
 from pathlib import Path
 import boto3
 from botocore.validate import validate_parameters
+from botocore.exceptions import ClientError
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from scripts.permissions import READ_ACTIONS,API_READ,allow,document
 
@@ -111,6 +112,11 @@ def foundation(cfg):
                             'Resource':[f'arn:aws-cn:s3:::{bucket}',f'arn:aws-cn:s3:::{bucket}/*'],
                             'Condition':{'Bool':{'aws:SecureTransport':'false'}}}])))
         if key=='work':s3.put_bucket_versioning(Bucket=bucket,VersioningConfiguration={'Status':'Enabled'})
+        if key=='work':
+            s3.put_bucket_cors(Bucket=bucket,CORSConfiguration={'CORSRules':[{
+                'AllowedOrigins':['http://localhost:3100','http://127.0.0.1:3100'],
+                'AllowedMethods':['GET','POST','PUT','HEAD'],'AllowedHeaders':['*'],
+                'ExposeHeaders':['ETag'],'MaxAgeSeconds':300}]})
         prefix='users/' if key=='chat' else 'cloudops/users/'
         rules=[{'ID':'history-30-days','Status':'Enabled','Filter':{'Prefix':prefix},
                 'Expiration':{'Days':30},'NoncurrentVersionExpiration':{'NoncurrentDays':30}}]
@@ -133,6 +139,7 @@ def foundation(cfg):
     common=[db_policy,*store_policy,allow(['secretsmanager:GetSecretValue'],cfg['model_secret_arn'])]
     iam=boto3.client('iam',region_name=region)
     cfg['runtime_role']=role(iam,cfg,'runtime','bedrock-agentcore.amazonaws.com',[*common,logs,*ecr,
+        allow(['transcribe:StartStreamTranscriptionWebSocket'],'*'),
         allow(['bedrock-agentcore:InvokeGateway'],f'arn:aws-cn:bedrock-agentcore:{region}:{account}:gateway/*'),
         allow(['xray:PutTraceSegments','xray:PutTelemetryRecords'],'*')])
     cfg['ec2_role']=role(iam,cfg,'web','ec2.amazonaws.com',[*common,
@@ -165,6 +172,17 @@ def zip_function(target):
             for folder in ('pricing','aws_api','agentcore'):z.write(f'tools/{folder}/policy.py',f'tools/{folder}/policy.py')
             z.write('tools/cloudtrail/pagination.py','tools/cloudtrail/pagination.py')
     return body.getvalue()
+
+def create_gateway_target(cp,args):
+    # Gateway execution-role updates may not have propagated yet.
+    for attempt in range(8):
+        try:
+            return cp.create_gateway_target(**args)
+        except ClientError as error:
+            if attempt==7 or 'execution role lacks permission' not in error.response['Error'].get('Message','').lower():
+                raise
+            time.sleep(5)
+
 
 def gateway(cfg):
     region=cfg['region'];account=cfg['account'];iam=boto3.client('iam',region_name=region)
@@ -235,7 +253,7 @@ def gateway(cfg):
              'toolSchema':{'inlinePayload':json.loads(Path('tools',folder,'tools.json').read_text())}}}},
              'credentialProviderConfigurations':[{'credentialProviderType':'GATEWAY_IAM_ROLE'}]}
         if target in current:result=cp.update_gateway_target(targetId=current[target]['targetId'],**args)
-        else:result=cp.create_gateway_target(**args)
+        else:result=create_gateway_target(cp,args)
         for _ in range(120):
             value=cp.get_gateway_target(gatewayIdentifier=g['gatewayId'],targetId=result['targetId'])
             if value['status']=='READY':break
