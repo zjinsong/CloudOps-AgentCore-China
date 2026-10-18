@@ -82,6 +82,4 @@ python scripts/init_config.py
 
 本项目提供应用账号登录和用户记录隔离；企业 SSO、租户级 AWS 权限隔离、自动答案语义评分和 Terraform 执行角色不包含在默认部署中。完整部署是否可用，应按测试指南在目标账号验收；本地测试不替代云端验证。
 
-本仓库聚焦 CloudOps，不包含 Codex Coding 工作区、代码沙箱、托管浏览器及录屏功能。
-
 [技术文档](docs/README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [来源与许可](NOTICE.md)
