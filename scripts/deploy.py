@@ -69,7 +69,7 @@ def role(iam,cfg,suffix,principal,statements):
 def foundation(cfg):
     region=cfg['region'];account=boto3.client('sts',region_name=region).get_caller_identity()['Account']
     cfg['account']=account
-    if not cfg['model_secret_arn'].startswith(f'arn:aws-cn:secretsmanager:{region}:{account}:secret/'):
+    if not cfg['model_secret_arn'].startswith(f'arn:aws-cn:secretsmanager:{region}:{account}:secret:'):
         raise ValueError('Model secret must be in this China account/region')
     if not cfg['image_uri'].startswith(f'{account}.dkr.ecr.{region}.amazonaws.com.cn/'):
         raise ValueError('Image must be in this China account/region')
@@ -136,7 +136,7 @@ def foundation(cfg):
         allow(['bedrock-agentcore:InvokeGateway'],f'arn:aws-cn:bedrock-agentcore:{region}:{account}:gateway/*'),
         allow(['xray:PutTraceSegments','xray:PutTelemetryRecords'],'*')])
     cfg['ec2_role']=role(iam,cfg,'web','ec2.amazonaws.com',[*common,
-        allow(['bedrock-agentcore:InvokeAgentRuntime','bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream','bedrock-agentcore:StopRuntimeSession'],runtime_prefix),
+        allow(['bedrock-agentcore:GetAgentRuntime','bedrock-agentcore:InvokeAgentRuntime','bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream','bedrock-agentcore:StopRuntimeSession'],runtime_prefix),
         allow(['bedrock-agentcore:InvokeGateway'],f'arn:aws-cn:bedrock-agentcore:{region}:{account}:gateway/*'),
         allow(['cloudwatch:ListMetrics','cloudwatch:GetMetricStatistics','cloudwatch:GetMetricData'],'*'),
         allow(['logs:FilterLogEvents'],f'arn:aws-cn:logs:{region}:{account}:log-group:aws/spans:*'),

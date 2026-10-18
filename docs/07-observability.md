@@ -2,6 +2,16 @@
 
 观测页面关联服务指标、DynamoDB 任务记录和 ADOT Span。任务 ID 标识业务任务，Trace/Span 表示模型、专家和 MCP 调用关系；并行 Span 的时长不能直接相加作为任务总耗时。
 
+## 页面与数据来源
+
+| 页面 | 数据 | 依赖 |
+| --- | --- | --- |
+| 服务指标 | Runtime 的调用、错误、延迟、连接/运行时长及 CPU/内存用量；Gateway 调用、错误、限流、延迟及 Target 执行时间 | CloudWatch 读取权限及实际调用产生的数据 |
+| 任务调用链：任务阶段 | 排队、执行、状态、耗时和尝试次数 | DynamoDB 任务记录 |
+| 任务调用链：SDK Span | 专家、模型和 MCP 调用的时间、父子关联及错误状态 | ADOT 上报、Trace 目的地及日志读取权限 |
+
+页面支持时间范围筛选和刷新；任务列表还支持状态/专家筛选及分页。CPU、内存单位为 vCPUh、GBh。`observer` 容器用于健康采样，服务指标页面由控制 API 查询 CloudWatch，不依赖该采样进程生成指标。
+
 ## 配置遥测
 
 项目使用 ADOT SDK，不部署 Collector。SDK 通过临时 AWS 凭证向 X-Ray OTLP 端点发送遥测，Trace 目的地为 CloudWatch Logs `aws/spans`。

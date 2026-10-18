@@ -16,6 +16,17 @@
 
 本地运行前端测试需要 Node.js 20 和 npm；仅通过 Docker 构建前端时不需要在主机安装 Node。EC2 仅开放所需管理入口，Web 通过 SSH 隧道访问。
 
+## 安装入口
+
+在 Ubuntu 24.04 上安装基础工具：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y python3.12 python3.12-venv python3-pip git curl unzip nano
+```
+
+Docker 按 [Docker 官方 Ubuntu 安装指南](https://docs.docker.com/engine/install/ubuntu/)安装 Engine、Buildx 和 Compose 插件；AWS CLI 按 [Linux x86_64 安装步骤](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)安装 v2。下文假设当前用户可运行 Docker 命令。部署主机还需访问 Docker Hub、Public ECR 和 HashiCorp 下载站点。
+
 ## 环境检查
 
 ```bash
@@ -24,7 +35,7 @@ aws sts get-caller-identity
 python3.12 --version
 docker version
 docker compose version
-docker buildx inspect --bootstrap
+docker buildx version
 git --version
 ```
 

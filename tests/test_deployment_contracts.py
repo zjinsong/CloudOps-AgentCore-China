@@ -2,8 +2,9 @@
 import json,unittest
 from pathlib import Path
 import boto3
+from unittest.mock import Mock, patch
 from botocore.validate import validate_parameters
-from scripts.deploy import TARGETS,zip_function
+from scripts.deploy import TARGETS,zip_function,foundation
 
 class DeploymentContracts(unittest.TestCase):
     def setUp(self):
@@ -12,6 +13,31 @@ class DeploymentContracts(unittest.TestCase):
     def validate(self,service,operation,args):
         c=boto3.client(service,region_name='cn-northwest-1',aws_access_key_id='validation-only',aws_secret_access_key='validation-only')
         validate_parameters(args,c.meta.service_model.operation_model(operation).input_shape)
+    def test_foundation_allows_observer_to_read_project_runtime_status(self):
+        cfg={'project':'cloudops-ref','region':'cn-northwest-1','model_id':'test',
+             'model_base_url':'https://model.example.com/v1',
+             'model_secret_arn':'arn:aws-cn:secretsmanager:cn-northwest-1:'+self.account+':secret:test',
+             'image_uri':self.account+'.dkr.ecr.cn-northwest-1.amazonaws.com.cn/cloudops-ref-runtime:test'}
+        tags=[{'Key':'Project','Value':cfg['project']},{'Key':'Repository','Value':'CloudOps-AgentCore-China'}]
+        clients={name:Mock() for name in ('sts','dynamodb','s3','iam')}
+        clients['sts'].get_caller_identity.return_value={'Account':self.account}
+        clients['dynamodb'].describe_table.return_value={'Table':{'TableArn':'test-table'}}
+        clients['dynamodb'].list_tags_of_resource.return_value={'Tags':tags}
+        clients['dynamodb'].describe_time_to_live.return_value={'TimeToLiveDescription':{'TimeToLiveStatus':'ENABLED'}}
+        clients['s3'].get_bucket_tagging.return_value={'TagSet':tags}
+        clients['iam'].list_instance_profile_tags.return_value={'Tags':tags}
+        web_arn='arn:aws-cn:iam::'+self.account+':role/cloudops-ref-web'
+        clients['iam'].get_instance_profile.return_value={'InstanceProfile':{'Roles':[{'Arn':web_arn}]}}
+        def role_arn(iam,config,suffix,principal,statements):
+            return 'arn:aws-cn:iam::'+self.account+':role/cloudops-ref-'+suffix
+        with patch('scripts.deploy.boto3.client',side_effect=lambda name,**kw:clients[name]), \
+             patch('scripts.deploy.role',side_effect=role_arn) as roles,patch('scripts.deploy.state'):
+            foundation(cfg)
+        web=next(call.args[4] for call in roles.call_args_list if call.args[2]=='web')
+        reads=[statement for statement in web if 'bedrock-agentcore:GetAgentRuntime' in statement['Action']]
+        self.assertEqual(len(reads),1)
+        self.assertEqual(reads[0]['Resource'],
+                         'arn:aws-cn:bedrock-agentcore:cn-northwest-1:'+self.account+':runtime/cloudops_ref_*')
     def test_gateway_request(self):
         self.validate('bedrock-agentcore-control','CreateGateway',{'name':'cloudops-ref-gateway','roleArn':self.role,'authorizerType':'AWS_IAM','protocolType':'MCP',
                       'tags':{'Project':'cloudops-ref','Repository':'CloudOps-AgentCore-China'}})

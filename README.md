@@ -33,28 +33,22 @@ flowchart LR
 
 本项目使用 Runtime、Gateway 和 Observability。对中国区不提供的托管 Memory、Harness、Registry、Policy 和 Evaluations，分别使用 DynamoDB/S3、应用任务调度、能力清单、IAM/代码校验及本地测试和云端验收；替代范围见[架构说明](docs/01-architecture.md)。服务支持范围以 [AWS 中国区官方说明](https://docs.amazonaws.cn/en_us/aws/latest/userguide/bedrock-agentcore.html)为准。
 
-## 部署、测试与清理
+## 部署
 
-| 步骤 | 文档 | 完成标准 |
-| --- | --- | --- |
-| 1 | [架构与中国区功能替代](docs/01-architecture.md) | 理解组件、权限和应用实现范围 |
-| 2 | [环境准备](docs/02-prerequisites.md) | Linux、AWS 身份、Docker 和模型端点可用 |
-| 3 | [部署](docs/03-deployment.md) | Runtime / Target READY，Web 可以登录 |
-| 4 | [测试与验收](docs/10-testing.md) | 单专家、协作、持久化与只读边界通过 |
-| 5 | [清理资源](docs/11-cleanup.md) | 按依赖删除项目资源并检查残留 |
+使用宁夏区测试账号和一台 Ubuntu 24.04 x86_64 EC2。需要 Python 3.12、Docker / Compose / Buildx、AWS CLI，以及支持工具调用的 OpenAI 兼容模型端点。
 
-部署入口：
+1. 按[环境准备](docs/02-prerequisites.md)检查工具、AWS 身份及 x86 → ARM64 构建环境。
+2. 按[部署指南](docs/03-deployment.md)完成下列阶段；该文档提供完整命令与每步验证结果。
 
-```bash
-git clone https://github.com/zjinsong/CloudOps-AgentCore-China.git
-cd CloudOps-AgentCore-China
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements-dev.txt
-python scripts/init_config.py
-```
+| 阶段 | 结果 |
+| --- | --- |
+| 初始化、ECR 与模型 Secret | 私有配置、镜像仓库和模型凭证 |
+| foundation | DynamoDB、S3、Runtime / EC2 角色 |
+| Layer 打包与 ARM64 镜像构建 | 工具依赖包、已推送 ECR 的 Runtime 镜像 |
+| gateway / runtimes | 八组 MCP Target、六个 Runtime READY |
+| 任务遥测与 Web 启动 | Trace 接收配置、可登录的页面 |
 
-随后按[部署指南](docs/03-deployment.md)创建模型 Secret 和 ECR 仓库，填写私有配置，再依次执行 `foundation`、`gateway`、`runtimes` 阶段。脚本不创建 EC2；完整部署需要云端资源和可访问的模型服务。
+脚本不创建 EC2。部署完成后，通过 SSH 隧道访问 `http://localhost:3100`，使用生成的 admin 密码登录。
 
 ## 页面功能
 
@@ -77,8 +71,14 @@ Web 提供 CloudOps 工作区和观测指标两个入口，包含以下功能：
 
 服务指标随应用部署提供；模型和工具的 SDK Span 需要完成遥测配置。CPU / 内存数值为资源用量，非实时利用率百分比。配置及排障见[观测与排障](docs/07-observability.md)，协作机制见[多 Agent 调度](docs/06-harness.md)，功能验收见[测试与验收](docs/10-testing.md)。
 
-## 使用范围
+## 测试与清理
 
-本项目提供应用账号登录和用户记录隔离；企业 SSO、租户级 AWS 权限隔离、自动答案语义评分和 Terraform 执行角色不包含在默认部署中。完整部署是否可用，应按测试指南在目标账号验收；本地测试不替代云端验证。
+| 文档 | 操作 |
+| --- | --- |
+| [测试与验收](docs/10-testing.md) | 检查服务，验证专家查询、团队管理、定时任务、服务指标与任务调用链 |
+| [清理资源](docs/11-cleanup.md) | 停止任务，按依赖删除云资源、日志和本地构建器 |
+| [更新与运维](docs/08-operations.md) | 发布新版本、回退和费用管理 |
+
+应用身份与数据权限范围见[安全边界](docs/09-security.md)。
 
 [技术文档](docs/README.md) · [贡献指南](CONTRIBUTING.md) · [安全报告](SECURITY.md) · [来源与许可](NOTICE.md)

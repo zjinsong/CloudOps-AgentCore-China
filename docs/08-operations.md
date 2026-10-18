@@ -18,9 +18,18 @@ docker compose up -d
 
 ## 回退
 
-将 `image_uri` 改为已保留的旧镜像 tag，再执行上述 Runtime 更新。Web 使用对应代码重新构建。镜像回退不回退 DynamoDB 数据结构、工具配置、IAM 或 Secret；涉及这些资源的变更需单独处理。
+将 `image_uri` 改为 ECR 中已保留的旧镜像 tag，直接发布，不重新构建或推送旧 tag：
+
+```bash
+python scripts/deploy.py runtimes --apply --update
+python scripts/validate_cloud.py
+```
+
+Web 切换到对应代码版本后重新构建。镜像回退不回退 DynamoDB 数据结构、工具配置、IAM 或 Secret；涉及这些资源的变更需单独处理。
 
 ## 运行检查
+
+云端配置校验使用部署身份或相应只读验收身份；容器运行仍使用 EC2 Role。
 
 ```bash
 python scripts/validate_cloud.py
@@ -32,7 +41,7 @@ docker compose logs --tail 100 control worker observer
 
 ## 费用与保留
 
-费用包括 EC2/EBS、Runtime、Gateway、Lambda、DynamoDB、S3、日志、网络和外部模型。默认关闭定时任务自动执行，历史 TTL 和 S3 生命周期默认 30 天；工作桶启用版本控制。TTL 异步删除，不能用于即时清理。
+费用包括 EC2/EBS、Runtime、Gateway、Lambda、DynamoDB、S3、日志、网络和外部模型。预置定时任务默认停用，历史 TTL 和 S3 生命周期默认 30 天；工作桶启用版本控制。TTL 异步删除，不能用于即时清理。
 
 按实际任务量、模型 token、工具调用和日志量设置预算。服务单价见 [AWS 中国区 AgentCore 价格](https://www.amazonaws.cn/agentcore/pricing/)。
 

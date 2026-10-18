@@ -39,8 +39,8 @@ aws secretsmanager create-secret --name "$PROJECT/model" \
 ## 3. 填写配置
 
 ```bash
-nano .state/deployment.json
 printf '%s\n' "$AWS_ACCOUNT_ID.dkr.ecr.cn-northwest-1.amazonaws.com.cn/$PROJECT-runtime:v1"
+nano .state/deployment.json
 ```
 
 | 字段 | 值 |
@@ -89,7 +89,21 @@ python scripts/validate_cloud.py
 
 创建六个 Runtime，等待平台 V2 READY，注册专家并校验 Gateway 工具能力映射；生成 `.secrets/control.env`。校验应输出六个 `READY V2` 和 `Gateway: 8 IAM targets READY`。
 
-## 8. 配置 EC2 身份并启动应用
+## 8. 配置任务遥测
+
+如需在页面查看模型和 MCP 的 SDK Span，使用部署身份执行：
+
+```bash
+aws xray get-trace-segment-destination --region cn-northwest-1
+python scripts/provision_task_observability.py \
+  --table "$PROJECT-tasks" --roles "$PROJECT-runtime" "$PROJECT-web"
+```
+
+该步骤修改账号/区域级 Trace 目的地和日志资源策略；先记录现有配置，确认同账号其他应用允许调整。任务索引应显示 ACTIVE。首次完成业务查询后再运行一次配置脚本，设置 `aws/spans` 日志保留期。配置细节见[观测与排障](07-observability.md)。
+
+跳过此步骤仍可查看服务指标和任务阶段记录，但 SDK Span 可能无法上报或读取。
+
+## 9. 配置 EC2 身份并启动应用
 
 为独立测试 EC2 附加生成的 instance profile，并允许 Docker bridge 使用 IMDSv2：
 
@@ -109,7 +123,7 @@ docker compose exec -T control python -c "import urllib.request; print(urllib.re
 
 已有 instance profile 时使用替换接口，不重复 associate。应用使用 EC2 临时凭证，勿向 `.secrets/control.env` 添加管理员访问密钥。预期 control healthy，worker、observer、frontend 运行；默认不启动 executor。
 
-## 9. 登录与验收
+## 10. 登录与验收
 
 在自己的电脑建立 SSH 隧道（替换主机和私钥）：
 
@@ -125,7 +139,7 @@ python -c 'import json; print(json.load(open(".secrets/web.json"))["ADMIN_PASSWO
 
 Web 仅监听 EC2 回环地址；公开 HTTPS 入口需另行配置，并设置 `COOKIE_SECURE=true`。
 
-按[测试与验收](10-testing.md)执行单专家、协作和恢复测试；需要调用链时配置[观测](07-observability.md)。测试结束后按[清理资源](11-cleanup.md)删除资源。
+按[测试与验收](10-testing.md)验证专家查询、页面功能、任务恢复和调用链。测试结束后按[清理资源](11-cleanup.md)删除资源。
 
 ## 失败处理
 

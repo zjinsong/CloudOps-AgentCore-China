@@ -4,9 +4,10 @@
 
 1. [架构与中国区功能替代](01-architecture.md)
 2. [环境准备](02-prerequisites.md)
-3. [部署](03-deployment.md)
-4. [测试与验收](10-testing.md)
-5. [清理资源](11-cleanup.md)
+3. [部署](03-deployment.md)：初始化、打包、发布、遥测和登录
+4. [观测与排障](07-observability.md)：服务指标和 Trace / Span
+5. [测试与验收](10-testing.md)
+6. [清理资源](11-cleanup.md)
 
 ## 技术参考
 
