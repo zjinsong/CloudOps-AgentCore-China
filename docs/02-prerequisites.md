@@ -1,47 +1,43 @@
-# 二、准备环境
+# 环境准备
 
-先准备一个测试账号和一台 Ubuntu Linux 主机。本指南使用宁夏区，工具 Lambda 使用 x86_64，Runtime 镜像使用 ARM64。
+本指南在一台独立的 Ubuntu EC2 上完成构建和 Web 部署。使用 AWS 中国区宁夏区域 `cn-northwest-1`；工具 Lambda 为 x86_64，Runtime 镜像为 ARM64。
 
-## 你需要准备什么
+## 环境要求
 
-| 条件 | 用途 |
+| 项目 | 要求 |
 | --- | --- |
-| AWS 中国区测试账号 | 创建 AgentCore、IAM、Lambda、DynamoDB、S3、ECR |
-| 部署身份的临时凭证或部署 Role | 创建资源；不能拿应用 Role 当部署管理员 |
-| Ubuntu 24.04 x86_64、Python 3.12 | 构建兼容 Lambda 的 Python Layer |
-| Docker Engine、Compose、Buildx | 构建两个容器镜像及 ARM64 Runtime 镜像 |
-| AWS CLI v2、Git | ECR、Secret 和代码操作 |
-| 可联网的模型 HTTPS 地址和密钥 | 模型推理；应先验证工具调用能力 |
+| AWS 账号 | 中国区测试账号，可使用宁夏区 AgentCore；部署身份具备资源创建权限 |
+| EC2 | Ubuntu 24.04 x86_64，建议起步 4 vCPU / 8 GiB，磁盘满足镜像与依赖构建 |
+| Python | 3.12、venv 和 pip |
+| 容器工具 | Docker Engine、Compose、Buildx，构建器支持 `linux/arm64` |
+| 命令行 | AWS CLI v2、Git、curl |
+| 模型 | 可从 EC2 和 Runtime 访问的 HTTPS OpenAI 兼容端点，支持工具调用 |
+| 网络 | 可拉取 PyPI/npm/容器依赖并访问 ECR、AWS API 和模型端点 |
 
-本地构建前端才需要 Node.js 20；Docker 构建前端会自行安装依赖。EC2 建议先用 4 vCPU、8 GiB 内存做构建与演示，最终规格应看实际负载。
+本地运行前端测试需要 Node.js 20 和 npm；仅通过 Docker 构建前端时不需要在主机安装 Node。EC2 仅开放所需管理入口，Web 通过 SSH 隧道访问。
+
+## 环境检查
 
 ```bash
-aws sts get-caller-identity --region cn-northwest-1
+export AWS_DEFAULT_REGION=cn-northwest-1
+aws sts get-caller-identity
 python3.12 --version
 docker version
 docker compose version
-docker buildx version
+docker buildx inspect --bootstrap
 git --version
 ```
 
-CLI 身份输出包含账号信息，只在自己的终端查看，不提交到仓库。
+Buildx 支持平台必须包含 `linux/arm64`。x86_64 主机需预先配置 ARM64 仿真或远端构建器。Lambda Layer 必须在 Linux x86_64 / Python 3.12 环境构建。
 
-## 权限分开
+## 身份与权限
 
-部署身份需要本项目涉及服务的创建、更新、Tag 和 `iam:PassRole` 权限。新账号首次使用 Runtime 还可能需要创建服务关联角色的权限。组织 SCP、权限边界、服务配额或角色传播延迟都可能影响部署。
+部署身份需要创建或更新 AgentCore、IAM、Lambda、DynamoDB、S3、ECR、Secrets Manager、EventBridge，以及相关 Tag 和 `iam:PassRole` 权限；首次使用相关服务可能需要创建服务关联角色。组织 SCP、权限边界及配额需允许这些操作。
 
-部署脚本生成的应用角色只访问自己的任务存储、模型 Secret、Runtime 和 Gateway；工具角色只获得选定的只读 AWS API。部署结束后 EC2 改用生成的 instance profile，不能把部署管理员密钥留在容器环境里。
+部署脚本生成 Runtime Role、EC2 Role、Gateway Role 和各工具 Lambda Role。运行应用时使用 EC2 instance profile，不向容器注入部署管理员凭证。只读工具动作见 [scripts/permissions.py](../scripts/permissions.py)。
 
-## ARM64 构建
+## 模型配置
 
-Runtime 容器使用 ARM64。在 x86_64 主机上，需要已有 ARM64 Buildx 构建器或 QEMU 仿真；也可以使用原生 ARM64 构建机。不要把 Windows/ARM64 主机上的 pip 安装目录直接打包为 x86_64 Lambda Layer。
+准备 `model_id`、HTTPS `model_base_url` 和 `api_key`。端点通常以 `/v1` 结尾，须支持 Strands 所需的 OpenAI 工具调用协议。Runtime 使用 PUBLIC 网络，不继承 EC2 的本地代理；仅在 EC2 测试模型成功不足以确认 Runtime 可达。
 
-检查 Buildx 支持的平台：
-
-```bash
-docker buildx inspect --bootstrap
-```
-
-若未包含 `linux/arm64`，先按你的容器管理规范配置构建器，再执行部署。Layer 构建仍使用 Linux x86_64 + Python 3.12。
-
-[下一章：逐步部署](03-deployment.md)
+[下一步：部署](03-deployment.md)

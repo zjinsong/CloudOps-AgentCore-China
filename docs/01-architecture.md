@@ -1,58 +1,65 @@
-# 一、先理解架构
+# 架构与中国区功能替代
 
-假设你问：“宁夏区运行中的 EC2 最近一小时 CPU 怎么样，昨天有人关机吗，费用值得关注吗？”
+## 组件
 
-一个模型可以生成查询建议，但真正完成任务还需要：登录校验、工具权限、实例发现、分页、并行查询、超时处理和结果存储。这些是本项目的主要工作。
-
-## 组件的分工
-
-| 组件 | 负责 | 项目里的位置 |
+| 组件 | 职责 | 实现 |
 | --- | --- | --- |
-| Runtime | 托管容器、隔离会话、伸缩 | 协调员和五个专家分别部署 |
-| Gateway | 把 Lambda 暴露成 MCP 工具，校验调用身份 | 八组工具共享一个入口 |
-| Identity | 工作负载身份及外部系统的凭证集成 | 本例没有创建 OAuth/API Key Provider |
-| Observability | 接收运行指标与遥测 | CloudWatch 指标、SDK Span |
-| Strands | 调用模型并执行模型选中的工具 | `framework/model.py` 和专家入口 |
-| 应用 harness | 约束、调度、恢复和验收任务 | `control/`、`framework/validator.py` |
-| DynamoDB / S3 | 持久任务状态、历史与检查点 | 控制服务和专家共享 |
-
-模型在 Runtime 外提供推理服务。Agent 使用 `MODEL_ID`、`MODEL_BASE_URL` 和 Secrets Manager 中的密钥调用它。当前适配器实现 OpenAI 兼容协议；接 Bedrock 原生 API 需增加相应模型适配器，不能只换 URL。
-
-## 入站、出站别混在一起
+| Web / 控制 API | 登录、会话、任务、结果和观测入口 | EC2 Docker Compose，React + FastAPI |
+| Worker | 计划校验、依赖调度、租约续约和失败恢复 | `control/` |
+| AgentCore Runtime | 托管协调员和五位专家 | ARM64 容器；协调员 WebSocket，专家 A2A |
+| Strands Agents | 模型调用与工具执行 | `framework/model.py`、`agents/` |
+| AgentCore Gateway | MCP 工具枚举与调用入口 | `AWS_IAM`，八组 Lambda Target |
+| DynamoDB | 任务、版本、租约、配置和历史索引 | 四个 GSI、TTL、时间点恢复 |
+| S3 | 对话正文、结果、附件和会话检查点 | 两个私有桶，历史默认 30 天 |
+| CloudWatch / X-Ray | 服务指标、日志和任务 Span | ADOT SDK，无独立 Collector |
+| Secrets Manager | 模型 API Key | Runtime Role 和 Web Role 按 ARN 读取 |
 
 ```mermaid
-flowchart LR
-    U[用户] -->|应用登录 Cookie| C[控制服务]
-    C -->|EC2 Role / SigV4 入站| R[Runtime]
-    R -->|Runtime Role / SigV4 入站| G[Gateway]
-    G -->|Gateway Role 出站| L[Lambda]
-    L -->|Lambda Role| A[AWS API]
-    R -.->|另行配置 Identity OAuth / API Key| X[外部系统]
+flowchart TD
+    U[浏览器] -->|应用 Cookie| W[控制 API]
+    W <--> D[(DynamoDB / S3)]
+    K[Worker] <--> D
+    W -->|SigV4 / WebSocket| C[协调员 Runtime]
+    K -->|SigV4 / A2A| E[专家 Runtime]
+    C --> M[模型 HTTPS 接口]
+    E --> M
+    E -->|Runtime Role / SigV4| G[Gateway]
+    G -->|Gateway Role| L[Lambda 工具]
+    L -->|Lambda Role| A[AWS 只读 API]
 ```
 
-**入站**回答“谁可以调用我”：本例 Runtime 和 Gateway 使用 IAM/SigV4；浏览器用户先登录应用，应用代为签名调用。企业方案可以改用 OIDC IdP 的 JWT，由 Runtime/Gateway 验证；登录页面仍由应用或 IdP 提供。
+## 任务执行
 
-**出站**回答“Agent 凭什么访问下游”：AWS 资源使用执行 Role；外部 SaaS 可用 Identity 管理 OAuth token 或 API Key，再由外部系统判断权限。用户登录过，不代表 Agent 自动获得全部外部权限。Role 也不会自动转换成任意 SaaS 的账户权限。
+1. 控制 API 校验用户并持久化任务。
+2. 协调员根据已启用专家、能力定义和 Gateway 工具清单生成最多六步的 DAG。
+3. 程序校验能力、区域和依赖；Worker 并行执行独立步骤，依赖步骤等待上游结果。
+4. 专家调用工具，保存结果及执行状态；上游失败时依赖分支不执行。
+5. 协调员汇总证据，区分真实数据、空数据、工具错误和未覆盖范围。
 
-本项目没有调用 Identity 的凭证获取接口，因此不是 OAuth/API Key 出站示例。Runtime 自动工作负载身份和外部凭证 Provider 是不同层次。
+DynamoDB 是任务状态来源；当前调度使用 `active-index`，不部署 SQS。Worker 使用执行租约和 S3 检查点恢复任务；页面连接与 Runtime 会话寿命不决定业务记录保留期。
 
-## 中国区怎么办
+## 权限与模型
 
-中国区可用 Runtime、Gateway、Identity、Observability，以及本项目未使用的 Browser、Code Interpreter。部分 Global 托管能力不在中国区提供。
+浏览器使用应用账号登录。控制服务通过 EC2 Role 调用 Runtime，专家通过 Runtime Role 调用 Gateway，Gateway Role 只调用项目 Lambda，Lambda Role 限制业务读取动作。用户记录隔离不等同于租户级 AWS 权限隔离。
 
-| 中国区差异 | 本项目的做法 |
-| --- | --- |
-| 托管 Memory 不可用 | DynamoDB 会话记录、S3 历史；不是语义长期记忆 |
-| 托管 Harness、Registry、Policy、Evaluations 不可用 | 应用调度、能力清单、代码校验、IAM 与离线评估 |
-| Gateway 工具语义搜索不可用 | 工具枚举、能力映射和专家工具白名单 |
-| Cognito 入站选项不可用 | 本例 IAM；企业登录可评估其他 OIDC IdP |
-| 部分内置 OAuth Provider 与私有 IdP 配置不可用 | 按中国区支持范围评估自定义集成，不能照搬 Global 快速配置 |
-| Gateway 推理目标和部分连接器不可用 | 模型从 Agent 直接调用；工具由 Lambda 接入 |
+模型运行在 AgentCore Runtime 之外，通过 `MODEL_ID`、`MODEL_BASE_URL` 和 Secrets Manager 中的 `api_key` 调用。当前适配器使用 OpenAI 兼容协议；Bedrock 原生 API 需要单独的模型适配器。模型端点必须支持工具调用，并可从 Runtime 网络访问。
 
-其他差异及最新支持范围见[官方中国区说明](https://docs.amazonaws.cn/en_us/aws/latest/userguide/bedrock-agentcore.html)。应用实现只解决自己的需求，不宣称复制了托管服务的全部能力。
+## 中国区差异与替代范围
 
-## 与 AWS 示例的关系
+以下依据 [AWS 中国区功能说明](https://docs.amazonaws.cn/en_us/aws/latest/userguide/bedrock-agentcore.html)核对（2026-10-18）。部署脚本限定宁夏区；服务在其他区域的可用性不代表脚本可直接迁移。
 
-参考 [AWS CloudOps 多 Agent 示例](https://github.com/aws-samples/sample-cloudops-multi-agent-system)的专业分工思路，本项目把 Agent 放进 Runtime，并增加持久任务、租约、能力验证和调用链。A2A 用于专家调用协议，MCP 用于工具协议；二者都不能代替任务调度和结果验收。
+| 中国区差异 | 本项目实现 | 范围 |
+| --- | --- | --- |
+| Memory 不提供 | DynamoDB 会话索引、S3 历史与检查点 | 持久化上下文，不含语义长期记忆 |
+| Harness 不提供 | Worker、依赖调度、租约、预算和恢复 | CloudOps 应用执行控制 |
+| Registry 不提供 | `hierarchy.json`、应用注册记录和能力映射 | 本应用专家与工具清单 |
+| Policy 和 Gateway rules 不提供 | IAM、工具/API 白名单、计划及参数校验 | 无托管策略引擎 |
+| Evaluations 不提供 | 本地测试、固定云端用例和人工证据核对 | 无自动语义评分服务 |
+| Gateway 工具语义搜索不提供 | `tools/list`、能力映射、专家工具白名单 | 显式工具发现 |
+| Runtime/Gateway 不支持 Cognito 入站 | Runtime/Gateway 使用 IAM；Web 使用应用登录 | 企业 OIDC 需另行集成 |
+| Gateway 推理目标不提供 | Agent 直接调用模型 HTTPS 端点 | 模型流量不经 Gateway |
+| Runtime 仅支持 MicroVM；不支持 S3 Files 挂载 | 按需运行容器，通过 S3 API 保存持久数据 | 不依赖本地持久文件系统 |
 
-[下一章：准备环境](02-prerequisites.md)
+中国区 Identity 存在私有 IdP 和部分内置 OAuth Provider 限制；本项目不配置 OAuth/API Key Provider，也不依赖连接器目录。Knowledge Bases、Payments、Optimizations、Browser 和 Code Interpreter 不参与本项目默认架构。
+
+[部署](03-deployment.md) · [协作实现](06-harness.md) · [权限](09-security.md)

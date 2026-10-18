@@ -5,7 +5,7 @@ from pathlib import Path
 def main():
     root=Path(__file__).resolve().parents[1]
     errors=[];count=0
-    for path in [root/'README.md',root/'handoff.md',root/'CONTRIBUTING.md',root/'SECURITY.md',*sorted((root/'docs').glob('*.md'))]:
+    for path in [*sorted(root.glob('*.md')),*sorted((root/'docs').glob('*.md'))]:
         for target in re.findall(r'\]\(([^)]+)\)',path.read_text(encoding='utf-8')):
             if '://' in target or target.startswith('#'):continue
             count+=1

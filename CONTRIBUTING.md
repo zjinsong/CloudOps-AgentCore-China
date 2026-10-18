@@ -1,15 +1,7 @@
 # 贡献指南
 
-先阅读[接手说明](handoff.md)。提交前执行：
+修改前阅读[架构](docs/01-architecture.md)。提交前运行[本地检查](docs/10-testing.md)。
 
-```bash
-python -m pytest tests -q
-python -m compileall -q agents control framework tools scripts examples
-python scripts/check_public.py --tree
-git diff --check
-cd frontend && npm ci && npm run build
-```
+新增工具应同步输入 Schema、Handler、只读 IAM、能力映射和分页逻辑。新增写操作必须配置独立执行权限、审批和幂等控制。模型、工具或权限变更后，重复云端业务验收。
 
-新增工具必须同时审阅输入 Schema、只读权限、Handler、能力映射和分页/覆盖语义。新增可写操作必须有独立执行权限、具体审批和幂等设计，不能只改提示词。
-
-禁止提交密钥、账号清单、用户密码、真实主机、客户数据或私有状态。Issue 与测试 fixture 也要脱敏。文档使用 Linux 命令和占位值，区分已经实现、已验证与规划。
+文档使用技术说明、可执行命令和明确的预期结果；部署命令使用 Linux 和占位配置。禁止提交真实账号、主机、凭证、客户数据或私有状态。`scripts/check_public.py` 用于辅助检查公开内容。

@@ -1,37 +1,37 @@
-# 九、安全边界
+# 安全边界
 
-## 公开内容与私有内容
+## 身份与数据
 
-公开：代码、Schema、占位配置、架构、测试、构建方法。私有：账号 ARN、部署状态、真实主机、模型密钥、管理员密码、私钥、客户日志和查询结果。
-
-`.state/`、`.secrets/`、密钥文件和构建产物被忽略。部署时自动生成随机密码，公开教程没有共用默认密码。发布扫描检查账号字面值、访问密钥、私钥、个人路径和遗留开发工作区标记。
-
-扫描不是全能的泄密检测器。新增文件仍须人工审阅内容和 Git diff；如果曾提交密钥，删除文件不足以处理历史，应立即撤销并清理历史。
-
-## 运行时边界
-
-| 边界 | 当前实现 |
+| 边界 | 实现 |
 | --- | --- |
-| 用户 → Web | 应用账号与签名 Cookie，拒绝空密码/弱签名配置 |
-| Web → Runtime | EC2 Role 的 SigV4 |
-| Runtime → Gateway | 执行 Role，限制到本项目 Gateway |
-| Gateway → Lambda | Gateway Role，限制到本项目函数 |
-| Lambda → AWS | 服务/API 白名单，只读业务查询 |
-| 模型密钥 | Secrets Manager，Role 读取 |
-| 历史数据 | 私有 S3、DDB，TTL 和生命周期 |
+| 用户 → Web | 应用账号、签名 Cookie 和 CSRF 校验 |
+| Web → Runtime | EC2 instance profile / SigV4 |
+| Runtime → Gateway | Runtime Role，限制本项目 Gateway |
+| Gateway → Lambda | Gateway Role，限制本项目函数 |
+| Lambda → AWS | 只读 API 白名单、区域与参数约束 |
+| 模型密钥 | Secrets Manager，按 Secret ARN 授权 |
+| 会话与结果 | 私有 DynamoDB/S3，TTL 和生命周期 |
 
-只读指业务资源；应用仍需写任务记录、日志和检查点。AWS 查询存在必须使用 `Resource: "*"` 的列表接口，部署脚本会按操作与区域约束，但这不是每实例级隔离。
+“只读”针对业务资源，应用仍写任务、日志和检查点。部分 AWS 列表接口要求 `Resource: "*"`；当前工具授权不是每实例级隔离。用户记录按应用用户隔离，不等同于租户独立 AWS 账号或 Role。
 
-应用多用户记录隔离，不等于每租户独立 AWS 账号/Role。企业生产环境应另行设计租户授权、企业 SSO、管理员角色、审计、备份和入口限流。当前企业 JWT 登录不是已实现功能。
+## 部署配置
+
+`.state/`、`.secrets/` 和私钥不提交到仓库。初始化生成随机管理员密码和签名密钥，无共享默认密码。运行应用使用 EC2 临时凭证，不在容器配置中保存部署管理员密钥。
+
+Web 默认仅监听 `127.0.0.1:3001`，通过 SSH 隧道访问。公开入口须配置 HTTPS、`COOKIE_SECURE=true` 及适当访问控制。企业 SSO 和租户级 AWS 授权需另行集成。
 
 ## 模型数据出口
 
-HTTPS 只解决传输加密。外部模型可能收到业务问题和工具结果，应使用经组织批准的模型、数据驻留策略和脱敏要求。不要让专家把凭证、个人信息或客户内容发给未经批准的端点。
+模型可能接收问题和工具结果。部署前确认模型端点、数据处理范围及组织的数据驻留要求；HTTPS 提供传输加密，不控制供应商的数据处理行为。
 
-## 默认关闭的能力
+## 执行限制
 
-Terraform plan/apply、自动创建巡检任务默认关闭。开启执行前必须设计单独权限、审批对象、有效期和动作 fingerprint；不允许用“用户说只读”代替 IAM 限制。
+默认 `CLOUDOPS_ENABLE_TERRAFORM_PLAN=false`、`CLOUDOPS_ENABLE_APPLY=false`，不启动 executor；默认巡检任务不自动执行。启用 Terraform 执行需要独立角色、审批、有效期和动作指纹，不能仅调整开关。
 
-公网发布需要 HTTPS、`COOKIE_SECURE=true` 和企业级入口策略。参考 Compose 只绑定回环地址，用 SSH 隧道演示。
+## 公开内容检查
 
-[报告安全问题](../SECURITY.md)
+```bash
+python scripts/check_public.py --tree
+```
+
+扫描覆盖常见账号、密钥和私有路径，提交前还应审阅 diff。安全问题通过[私密漏洞报告](../SECURITY.md)反馈。
